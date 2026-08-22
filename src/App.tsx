@@ -89,6 +89,13 @@ export default function App() {
     if (g?.seasonDone && (screen === "hub" || screen === "post")) setScreen("end");
   }, [g?.seasonDone, screen]);
 
+  /* si entrás a la pantalla de partido pero ya no hay fixture (copa/fin), volvemos solos */
+  useEffect(() => {
+    if (screen === "match" && g && !userNextFixture(g)) {
+      setScreen(g.seasonDone ? "end" : "hub");
+    }
+  }, [screen, g]);
+
   const toggleMute = () => setMuted(sfx.toggleMute());
 
   const continueSeason = () => {
@@ -170,11 +177,7 @@ export default function App() {
   /* ---- partido en vivo ---- */
   if (screen === "match") {
     const fx = userNextFixture(g);
-    if (!fx) {
-      if (g.seasonDone) setScreen("end");
-      else setScreen("hub");
-      return null;
-    }
+    if (!fx) return null; // el effect de arriba te devuelve a hub/end
     const isHome = fx.home === g.userClub;
     const userSide: 0 | 1 = isHome ? 0 : 1;
     const rivalId = isHome ? fx.away : fx.home;
