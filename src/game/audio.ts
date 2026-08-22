@@ -69,6 +69,9 @@ class Sfx {
   click() { this.blip(660, 0.07, "square", 0.05); }
   tab() { this.blip(440, 0.08, "square", 0.05, 160); }
   kick() { this.noise(0.12, 0.16, 500); this.blip(110, 0.1, "sine", 0.14, -50); }
+  pass() { this.noise(0.06, 0.07, 700); this.blip(220, 0.05, "sine", 0.05); }
+  tackle() { this.noise(0.09, 0.12, 350); this.blip(150, 0.08, "sine", 0.08, -60); }
+  post() { this.blip(180, 0.3, "triangle", 0.14, -30); this.noise(0.2, 0.1, 900); }
   whistle(long = false) {
     this.blip(2100, long ? 0.7 : 0.28, "sine", 0.07, 120);
     if (!long) this.blip(2100, 0.16, "sine", 0.05, 120);
