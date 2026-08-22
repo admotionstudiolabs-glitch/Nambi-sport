@@ -1,0 +1,262 @@
+import type { ClubRow } from "../core";
+
+/* LaLiga de España — temporada actual */
+export const ES1: ClubRow[] = [
+  ["Real Madrid", "RMA", "#f4f4f4", "#ffc233", "v", 5, 81000, 42, 90, [
+    ["Thibaut Courtois", "ARQ", 89], ["Andriy Lunin", "ARQ", 82],
+    ["Dani Carvajal", "DEF", 86], ["Éder Militão", "DEF", 86], ["Antonio Rüdiger", "DEF", 87],
+    ["Ferland Mendy", "DEF", 83], ["Trent Alexander-Arnold", "DEF", 87], ["Dean Huijsen", "DEF", 84],
+    ["Jude Bellingham", "MED", 91], ["Federico Valverde", "MED", 89], ["Aurélien Tchouaméni", "MED", 87], ["Arda Güler", "MED", 86],
+    ["Vinícius Júnior", "DEL", 92], ["Kylian Mbappé", "DEL", 93], ["Rodrygo Goes", "DEL", 88], ["Endrick", "DEL", 82],
+  ]],
+  ["Barcelona", "BAR", "#16308f", "#d31245", "v", 5, 99000, 40, 89, [
+    ["Marc-André ter Stegen", "ARQ", 87], ["Joan García", "ARQ", 83],
+    ["Ronald Araújo", "DEF", 86], ["Pau Cubarsí", "DEF", 84], ["Íñigo Martínez", "DEF", 84], ["Alejandro Balde", "DEF", 85],
+    ["Pedri González", "MED", 89], ["Gavi Páez", "MED", 87], ["Frenkie de Jong", "MED", 87], ["Dani Olmo", "MED", 86],
+    ["Lamine Yamal", "DEL", 90], ["Raphinha", "DEL", 89], ["Robert Lewandowski", "DEL", 88], ["Ferran Torres", "DEL", 84],
+  ]],
+  ["Atlético de Madrid", "ATM", "#d31230", "#16308f", "v", 4, 70000, 28, 82, [
+    ["Jan Oblak", "ARQ", 88], ["Juan Musso", "ARQ", 78],
+    ["José Giménez", "DEF", 84], ["Robin Le Normand", "DEF", 84], ["Reinildo Mandava", "DEF", 81], ["Marcos Llorente", "DEF", 85],
+    ["Koke Resurrección", "MED", 84], ["Pablo Barrios", "MED", 83], ["Rodrigo De Paul", "MED", 85], ["Conor Gallagher", "MED", 84],
+    ["Antoine Griezmann", "DEL", 88], ["Julián Álvarez", "DEL", 88], ["Alexander Sorloth", "DEL", 85],
+  ]],
+  ["Athletic Club", "ATH", "#d31230", "#f4f4f4", "v", 4, 53000, 20, 76, [
+    ["Unai Simón", "ARQ", 86], ["Julen Agirrezabala", "ARQ", 81],
+    ["Dani Vivian", "DEF", 83], ["Aitor Paredes", "DEF", 83], ["Yuri Berchiche", "DEF", 82], ["Óscar de Marcos", "DEF", 80],
+    ["Mikel Jauregizar", "MED", 81], ["Íñigo Ruiz de Galarreta", "MED", 81], ["Unai Gómez", "MED", 80],
+    ["Nico Williams", "DEL", 88], ["Iñaki Williams", "DEL", 84], ["Gorka Guruzeta", "DEL", 82], ["Oihan Sancet", "DEL", 85],
+  ]],
+  ["Real Sociedad", "RSO", "#1668c7", "#f4f4f4", "v", 3, 39000, 16, 72, [
+    ["Álex Remiro", "ARQ", 85], ["Unai Marrero", "ARQ", 77],
+    ["Igor Zubeldia", "DEF", 82], ["Aritz Elustondo", "DEF", 80], ["Aihen Muñoz", "DEF", 80], ["Hamari Traoré", "DEF", 79],
+    ["Martín Zubimendi", "MED", 86], ["Brais Méndez", "MED", 84], ["Takefusa Kubo", "MED", 85], ["Sergio Gómez", "MED", 80],
+    ["Mikel Oyarzabal", "DEL", 86], ["Ander Barrenetxea", "DEL", 81], ["Orri Óskarsson", "DEL", 79],
+  ]],
+  ["Villarreal", "VIL", "#ffd400", "#1668c7", "v", 3, 23000, 17, 70, [
+    ["Diego Conde", "ARQ", 80], ["Luiz Júnior", "ARQ", 78],
+    ["Raúl Albiol", "DEF", 80], ["Logan Costa", "DEF", 80], ["Sergi Cardona", "DEF", 79], ["Kiko Femenía", "DEF", 79],
+    ["Dani Parejo", "MED", 84], ["Étienne Capoue", "MED", 80], ["Álex Baena", "MED", 85], ["Pape Gueye", "MED", 80],
+    ["Gerard Moreno", "DEL", 84], ["Thierno Barry", "DEL", 81], ["Yéremy Pino", "DEL", 83],
+  ]],
+  ["Real Betis", "BET", "#0f5c3a", "#f4f4f4", "v", 3, 60000, 15, 74, [
+    ["Rui Silva", "ARQ", 82], ["Adrián San Miguel", "ARQ", 76],
+    ["Marc Bartra", "DEF", 80], ["Diego Llorente", "DEF", 81], ["Romain Perraud", "DEF", 80], ["Youssouf Sabaly", "DEF", 79],
+    ["Isco Alarcón", "MED", 85], ["Guido Rodríguez", "MED", 82], ["Johnny Cardoso", "MED", 81], ["Pablo Fornals", "MED", 83],
+    ["Antony Santos", "DEL", 84], ["Cucho Hernández", "DEL", 82], ["Ayoze Pérez", "DEL", 82],
+  ]],
+  ["Sevilla", "SEV", "#d31230", "#f4f4f4", "v", 3, 43000, 14, 73, [
+    ["Orjan Nyland", "ARQ", 79], ["Álvaro Fernández", "ARQ", 76],
+    ["Nemanja Gudelj", "DEF", 79], ["Loïc Badé", "DEF", 82], ["Kike Salas", "DEF", 79], ["Adriá Pedrosa", "DEF", 79],
+    ["Lucien Agoumé", "MED", 79], ["Sambi Lokonga", "MED", 80], ["Djibril Sow", "MED", 80],
+    ["Isaac Romero", "DEL", 80], ["Dodi Lukebakio", "DEL", 83], ["Chidera Ejuke", "DEL", 79],
+  ]],
+  ["Valencia", "VAL", "#f4f4f4", "#ff7a1a", "v", 3, 49000, 13, 71, [
+    ["Giorgi Mamardashvili", "ARQ", 85], ["Stole Dimitrievski", "ARQ", 78],
+    ["Cristhian Mosquera", "DEF", 82], ["Mouctar Diakhaby", "DEF", 80], ["José Gayà", "DEF", 83], ["Thierry Correia", "DEF", 79],
+    ["Javi Guerra", "MED", 83], ["Pepelu García", "MED", 81], ["André Almeida", "MED", 81],
+    ["Hugo Duro", "DEL", 81], ["Diego López", "DEL", 80], ["Luis Rioja", "DEL", 79],
+  ]],
+  ["Celta de Vigo", "CEL", "#7bc3df", "#f4f4f4", "v", 2, 29000, 11, 64, [
+    ["Vicente Guaita", "ARQ", 80], ["Iván Villar", "ARQ", 76],
+    ["Carl Starfelt", "DEF", 80], ["Unai Núñez", "DEF", 79], ["Óscar Mingueza", "DEF", 80], ["Javi Rueda", "DEF", 76],
+    ["Fran Beltrán", "MED", 80], ["Ilaix Moriba", "MED", 80], ["Hugo Sotelo", "MED", 77],
+    ["Iago Aspas", "DEL", 84], ["Borja Iglesias", "DEL", 81], ["Anastasios Douvikas", "DEL", 80],
+  ]],
+  ["Osasuna", "OSA", "#0f5c3a", "#d31230", "v", 2, 23000, 10, 62, [
+    ["Sergio Herrera", "ARQ", 80], ["Aitor Fernández", "ARQ", 77],
+    ["David García", "DEF", 80], ["Alejandro Catena", "DEF", 79], ["Jesús Areso", "DEF", 80], ["Juan Cruz", "DEF", 78],
+    ["Lucas Torró", "MED", 80], ["Aimar Oroz", "MED", 82], ["Jon Moncayola", "MED", 80],
+    ["Ante Budimir", "DEL", 82], ["Raúl García de Haro", "DEL", 78], ["Bryan Zaragoza", "DEL", 81],
+  ]],
+  ["Rayo Vallecano", "RAY", "#f4f4f4", "#d31230", "s", 2, 14000, 9, 58, [
+    ["Augusto Batalla", "ARQ", 79], ["Dani Cárdenas", "ARQ", 75],
+    ["Florian Lejeune", "DEF", 80], ["Aridane Hernández", "DEF", 78], ["Iván Balliu", "DEF", 78], ["Pep Chavarría", "DEF", 78],
+    ["Óscar Valentín", "MED", 79], ["Pathé Ciss", "MED", 79], ["Isi Palazón", "MED", 82],
+    ["Jorge de Frutos", "DEL", 80], ["Álvaro García", "DEL", 79], ["Sergi Guardiola", "DEL", 77],
+  ]],
+  ["Girona", "GIR", "#d31230", "#f4f4f4", "v", 3, 14000, 12, 60, [
+    ["Paulo Gazzaniga", "ARQ", 81], ["Juan Carlos Martín", "ARQ", 75],
+    ["David López", "DEF", 79], ["Daley Blind", "DEF", 82], ["Miguel Gutiérrez", "DEF", 82], ["Arnau Martínez", "DEF", 79],
+    ["Yangel Herrera", "MED", 81], ["Iván Martín", "MED", 80], ["Donny van de Beek", "MED", 81],
+    ["Viktor Tsygankov", "DEL", 84], ["Artem Dovbyk", "DEL", 84], ["Cristhian Stuani", "DEL", 80],
+  ]],
+  ["Mallorca", "MAL", "#d31230", "#141414", "v", 2, 23000, 10, 60, [
+    ["Dominik Greif", "ARQ", 79], ["Leo Román", "ARQ", 75],
+    ["Martin Valjent", "DEF", 79], ["Antonio Raíllo", "DEF", 80], ["Pablo Maffeo", "DEF", 79], ["Johan Mojica", "DEF", 79],
+    ["Samu Costa", "MED", 80], ["Manu Morlanes", "MED", 79], ["Sergi Darder", "MED", 81],
+    ["Vedat Muriqi", "DEL", 82], ["Cyle Larin", "DEL", 80], ["Dani Rodríguez", "DEL", 78],
+  ]],
+  ["Getafe", "GET", "#1668c7", "#f4f4f4", "v", 2, 17000, 8, 56, [
+    ["David Soria", "ARQ", 80], ["Jiri Letacek", "ARQ", 75],
+    ["Djené Dakonam", "DEF", 80], ["Omar Alderete", "DEF", 80], ["Juan Iglesias", "DEF", 78], ["Diego Rico", "DEF", 78],
+    ["Luis Milla", "MED", 81], ["Mauro Arambarri", "MED", 80], ["Carles Aleñá", "MED", 80],
+    ["Borja Mayoral", "DEL", 80], ["Uche Madueke", "DEL", 77], ["Juanmi Jiménez", "DEL", 78],
+  ]],
+  ["Alavés", "ALA", "#1668c7", "#f4f4f4", "v", 1, 19000, 7, 52, [
+    ["Antonio Sivera", "ARQ", 79], ["Jesús Owono", "ARQ", 74],
+    ["Abdel Abqar", "DEF", 78], ["Nahuel Tenaglia", "DEF", 78], ["Moussa Diarra", "DEF", 77], ["Manu Sánchez", "DEF", 77],
+    ["Antonio Blanco", "MED", 79], ["Ander Guevara", "MED", 78], ["Carlos Vicente", "MED", 78],
+    ["Kike García", "DEL", 79], ["Toni Martínez", "DEL", 78], ["Jon Guridi", "DEL", 77],
+  ]],
+  ["Espanyol", "ESP", "#1668c7", "#f4f4f4", "v", 2, 40000, 9, 61, [
+    ["Joan García", "ARQ", 82], ["Fernando Pacheco", "ARQ", 76],
+    ["Leandro Cabrera", "DEF", 79], ["Marash Kumbulla", "DEF", 79], ["Omar El Hilali", "DEF", 78], ["Carlos Romero", "DEF", 77],
+    ["Pol Lozano", "MED", 78], ["Edu Expósito", "MED", 79], ["Jofre Carreras", "MED", 78],
+    ["Javi Puado", "DEL", 81], ["Waldo Rubio", "DEL", 77], ["Alejo Véliz", "DEL", 77],
+  ]],
+  ["Las Palmas", "LPA", "#ffd400", "#1668c7", "v", 1, 31000, 7, 54, [
+    ["Jasper Cillessen", "ARQ", 81], ["Dinko Horkas", "ARQ", 74],
+    ["Álex Suárez", "DEF", 78], ["Scott McKenna", "DEF", 79], ["Mika Mármol", "DEF", 78], ["Marvin Park", "DEF", 77],
+    ["Kirian Rodríguez", "MED", 81], ["Javi Muñoz", "MED", 78], ["Alberto Moleiro", "MED", 80],
+    ["Sandro Ramírez", "DEL", 79], ["Fabio Silva", "DEL", 79], ["Marc Cardona", "DEL", 76],
+  ]],
+  ["Leganés", "LEG", "#1668c7", "#f4f4f4", "v", 1, 12000, 6, 50, [
+    ["Marko Dmitrovic", "ARQ", 80], ["Juan Soriano", "ARQ", 75],
+    ["Sergio González", "DEF", 77], ["Matija Nastasic", "DEF", 78], ["Javi Hernández", "DEF", 76], ["Valentin Rosier", "DEF", 77],
+    ["Yvan Neyou", "MED", 77], ["Dani Raba", "MED", 79], ["Óscar Rodríguez", "MED", 79],
+    ["Miguel de la Fuente", "DEL", 77], ["Diego García", "DEL", 76], ["Munir El Haddadi", "DEL", 77],
+  ]],
+  ["Valladolid", "VLL", "#7a1023", "#f4f4f4", "v", 1, 26000, 6, 53, [
+    ["Karl Hein", "ARQ", 77], ["André Ferreira", "ARQ", 76],
+    ["Javi Sánchez", "DEF", 77], ["Cenk Özkacar", "DEF", 76], ["Luis Pérez", "DEF", 76], ["Lucas Rosa", "DEF", 76],
+    ["Kike Pérez", "MED", 78], ["Anuar Tuhami", "MED", 76], ["Iván Sánchez", "MED", 76],
+    ["Marcos André", "DEL", 78], ["Raúl Moro", "DEL", 77], ["Juanmi Latasa", "DEL", 76],
+  ]],
+];
+
+/* LaLiga 2 (segunda división de España) */
+export const ES2: ClubRow[] = [
+  ["Deportivo La Coruña", "DEP", "#1668c7", "#f4f4f4", "v", 2, 32000, 8, 66, [
+    ["Germán Parreño", "ARQ", 76],
+    ["Pablo Vázquez", "DEF", 76], ["Dani Barcia", "DEF", 75], ["Ximo Navarro", "DEF", 75],
+    ["José Ángel Jurado", "MED", 76], ["Mario Soriano", "MED", 77], ["Yeremay Hernández", "MED", 79],
+    ["Lucas Pérez", "DEL", 79], ["Iván Barbero", "DEL", 76], ["Zakaria Eddahchouri", "DEL", 76],
+  ]],
+  ["Sporting de Gijón", "SGI", "#d31230", "#f4f4f4", "v", 2, 30000, 8, 63, [
+    ["Rubén Yáñez", "ARQ", 77],
+    ["Rober Pier", "DEF", 76], ["Pablo Insua", "DEF", 75], ["Diego Sánchez", "DEF", 75],
+    ["Nacho Méndez", "MED", 77], ["César Gelabert", "MED", 78], ["Fran Villalba", "MED", 76],
+    ["Juan Otero", "DEL", 77], ["Gaspar Campos", "DEL", 77], ["Uros Djurdjevic", "DEL", 77],
+  ]],
+  ["Racing de Santander", "RACI", "#0f5c3a", "#f4f4f4", "v", 2, 22000, 8, 61, [
+    ["Jokin Ezkieta", "ARQ", 76],
+    ["Germán Sánchez", "DEF", 75], ["Manu Hernando", "DEF", 75], ["Javi Castro", "DEF", 75],
+    ["Iñigo Vicente", "MED", 78], ["Andrés Martín", "MED", 77], ["Peio Canales", "MED", 76],
+    ["Arana Suárez", "DEL", 77], ["Suleiman Camara", "DEL", 76], ["Pablo Rodríguez", "DEL", 76],
+  ]],
+  ["Levante", "LEV", "#16308f", "#d31230", "v", 2, 26000, 9, 62, [
+    ["Andrés Fernández", "ARQ", 77],
+    ["Unai Elgezabal", "DEF", 76], ["Dela Fuentes", "DEF", 75], ["Pampín García", "DEF", 75],
+    ["Oriol Rey", "MED", 77], ["Pablo Martínez", "MED", 76], ["Giorgi Kochorashvili", "MED", 77],
+    ["José Luis Morales", "DEL", 79], ["Iván Romero", "DEL", 77], ["Roger Brugué", "DEL", 76],
+  ]],
+  ["Granada", "GRA", "#d31230", "#f4f4f4", "v", 2, 23000, 9, 62, [
+    ["Luca Zidane", "ARQ", 77],
+    ["Miguel Rubio", "DEF", 76], ["Loïc Williams", "DEF", 76], ["Carlos Neva", "DEF", 76],
+    ["Sergio Ruiz", "MED", 77], ["Gonzalo Villar", "MED", 78], ["Manu Trigueros", "MED", 78],
+    ["Myrto Uzuni", "DEL", 80], ["Lucas Boyé", "DEL", 79], ["Weissman Shon", "DEL", 77],
+  ]],
+  ["Real Oviedo", "OVI", "#1668c7", "#f4f4f4", "v", 2, 30000, 8, 62, [
+    ["Aarón Escandell", "ARQ", 77],
+    ["Dani Calvo", "DEF", 76], ["David Costas", "DEF", 76], ["Rahim Alhassane", "DEF", 74],
+    ["Santi Cazorla", "MED", 80], ["Sebas Moyano", "MED", 76], ["Kwasi Sibo", "MED", 75],
+    ["Alemao Ferreira", "DEL", 77], ["Ilyas Chaira", "DEL", 76], ["Fede Viñas", "DEL", 76],
+  ]],
+  ["Zaragoza", "ZAR", "#1668c7", "#ffd400", "v", 2, 33000, 8, 64, [
+    ["Adrián Rodríguez", "ARQ", 75],
+    ["Jair Amador", "DEF", 75], ["Marcos Luna", "DEF", 75], ["Lluís López", "DEF", 76],
+    ["Toni Moya", "MED", 77], ["Francho Serrano", "MED", 77], ["Keidi Bare", "MED", 77],
+    ["Mario Soberón", "DEL", 77], ["Samed Bazdar", "DEL", 76], ["Iván Azón", "DEL", 76],
+  ]],
+  ["Almería", "ALM", "#d31230", "#f4f4f4", "v", 2, 18000, 9, 58, [
+    ["Luis Maximiano", "ARQ", 78],
+    ["Chumi Brandariz", "DEF", 75], ["Edgar González", "DEF", 77], ["Álex Centelles", "DEF", 75],
+    ["Luis Suárez", "DEL", 79], ["Sergio Arribas", "MED", 78], ["Lucas Robertone", "MED", 77],
+    ["Adrián Embarba", "DEL", 78], ["Leo Baptistao", "DEL", 76], ["Marc Pubill", "DEF", 76],
+  ]],
+  ["Elche", "ELC", "#0f5c3a", "#f4f4f4", "v", 2, 33000, 8, 60, [
+    ["Dituro Ramírez", "ARQ", 78],
+    ["Pedro Bigas", "DEF", 76], ["Álvaro Núñez", "DEF", 75], ["Mario Gaspar", "DEF", 76],
+    ["Gerard Gumbau", "MED", 77], ["Aleix Febas", "MED", 76], ["Yago Santiago", "MED", 75],
+    ["Mourad El Ghezouani", "DEL", 77], ["Óscar Plano", "DEL", 76], ["Rafa Núñez", "DEL", 75],
+  ]],
+  ["Eibar", "EIB", "#d31230", "#16308f", "v", 2, 8000, 7, 55, [
+    ["Jon Magunagoitia", "ARQ", 75],
+    ["Anaitz Arbilla", "DEF", 76], ["José Corpas", "DEF", 76], ["Álvaro Carrillo", "DEF", 75],
+    ["Matheus Pereira", "MED", 77], ["Peru Nolaskoain", "MED", 76], ["Jorge Pascual", "MED", 75],
+    ["Jon Bautista", "DEL", 77], ["Aingeru Olabarrieta", "DEL", 75], ["Iker Benito", "DEL", 74],
+  ]],
+  ["Cádiz", "CAD", "#ffd400", "#1668c7", "v", 2, 25000, 7, 59, [
+    ["David Gil", "ARQ", 76],
+    ["Víctor Chust", "DEF", 76], ["Iker Recio", "DEF", 75], ["José Antonio Caro", "DEF", 75],
+    ["Rubén Alcaraz", "MED", 76], ["Álex Fernández", "MED", 76], ["Gonzalo Escalante", "MED", 77],
+    ["Chris Ramos", "DEL", 77], ["Roger Martí", "DEL", 77], ["Brian Ocampo", "DEL", 76],
+  ]],
+  ["Tenerife", "TEN", "#1668c7", "#f4f4f4", "v", 1, 23000, 6, 54, [
+    ["Juan Soriano", "ARQ", 76],
+    ["Sergio González", "DEF", 75], ["Jérémy Mellot", "DEF", 75], ["David Rodríguez", "DEF", 74],
+    ["Aitor Sanz", "MED", 75], ["Yanis Senhadji", "MED", 75], ["Roberto López", "MED", 77],
+    ["Enric Gallego", "DEL", 76], ["Waldo Rubio", "DEL", 75], ["Teto Martín", "DEL", 75],
+  ]],
+  ["Cartagena", "CAR", "#141414", "#f4f4f4", "v", 1, 15000, 5, 46, [
+    ["Pablo Campos", "ARQ", 74],
+    ["Pedro Alcalá", "DEF", 74], ["Jorge Moreno", "DEF", 74], ["Kiko Olivas", "DEF", 75],
+    ["Luis Muñoz", "MED", 75], ["Andy Rodríguez", "MED", 74], ["Óscar Clemente", "MED", 75],
+    ["Alfredo Ortuño", "DEL", 76], ["Dani Escriche", "DEL", 75], ["Álex Millán", "DEL", 74],
+  ]],
+  ["Racing de Ferrol", "RFE", "#0f5c3a", "#f4f4f4", "v", 1, 12000, 5, 45, [
+    ["Yoel Rodríguez", "ARQ", 75],
+    ["Enzo Fernández", "DEF", 74], ["Julián Delmás", "DEF", 74], ["Nacho Monsalve", "DEF", 74],
+    ["Fran Manzanara", "MED", 74], ["Josep Señé", "MED", 75], ["Álvaro Giménez", "DEL", 75],
+    ["Jaime Seoane", "MED", 75], ["Nacho Sánchez", "DEL", 74], ["Eneko Jauregi", "DEL", 74],
+  ]],
+  ["Mirandés", "MIR", "#d31230", "#141414", "v", 1, 6000, 5, 44, [
+    ["Raúl Fernández", "ARQ", 75],
+    ["Sergio Postigo", "DEF", 75], ["Unai Egiluz", "DEF", 74], ["Iker Benito", "DEF", 73],
+    ["Alberto Reina", "MED", 75], ["Hugo Rincón", "MED", 75], ["Javi Llabrés", "MED", 75],
+    ["Joaquín Panichelli", "DEL", 76], ["Iker Córdoba", "DEL", 73], ["Mathis Lachuer", "DEL", 74],
+  ]],
+  ["Castellón", "CAS", "#141414", "#0f5c3a", "v", 1, 16000, 5, 47, [
+    ["Gonzalo Crettaz", "ARQ", 75],
+    ["Alberto Jiménez", "DEF", 74], ["Salva Ruiz", "DEF", 75], ["Thomas Van den Belt", "DEF", 74],
+    ["Jozhua Vertrouwd", "MED", 75], ["Óscar Gil", "MED", 74], ["Sergio Moyita", "MED", 75],
+    ["Raúl Sánchez", "DEL", 76], ["Israel Suero", "DEL", 75], ["Jesús de Miguel", "DEL", 75],
+  ]],
+  ["Huesca", "HUE", "#16308f", "#d31230", "v", 1, 9000, 5, 46, [
+    ["Álvaro Fernández", "ARQ", 76],
+    ["Jorge Pulido", "DEF", 75], ["Íñigo Piña", "DEF", 74], ["Ángel Pérez", "DEF", 73],
+    ["Javi Martínez", "MED", 75], ["Jesús Álvarez", "MED", 74], ["Hugo Vallejo", "MED", 75],
+    ["Patrick Soko", "DEL", 76], ["Sergi Enrich", "DEL", 76], ["Dani Ojeda", "DEL", 74],
+  ]],
+  ["Córdoba", "COR", "#0f5c3a", "#f4f4f4", "v", 1, 21000, 5, 52, [
+    ["Carlos Marín", "ARQ", 75],
+    ["Albarrán Rubio", "DEF", 74], ["Xavi Sintes", "DEF", 74], ["Carlos Isaac", "DEF", 74],
+    ["Isma Ruiz", "MED", 75], ["Álex Sala", "MED", 75], ["Pedro Ortiz", "MED", 74],
+    ["Adilson Mendes", "DEL", 75], ["Antonio Casas", "DEL", 76], ["Jacobo González", "DEL", 75],
+  ]],
+  ["Burgos", "BUR", "#f4f4f4", "#141414", "v", 1, 12000, 5, 45, [
+    ["José Antonio Caro", "ARQ", 75],
+    ["Aitor Córdoba", "DEF", 75], ["Unai Elgezabal", "DEF", 74], ["Florian Miguel", "DEF", 74],
+    ["Atienza Maza", "MED", 74], ["Dani Ojeda", "MED", 75], ["Álex Sancris", "MED", 75],
+    ["Curro Sánchez", "DEL", 76], ["Fer Niño", "DEL", 75], ["Edu Espiau", "DEL", 74],
+  ]],
+  ["Albacete", "ALB", "#f4f4f4", "#d31230", "v", 1, 17000, 5, 48, [
+    ["Diego Altube", "ARQ", 74],
+    ["Antonio Cristian Glauder", "DEF", 75], ["Jaume Costa", "DEF", 75], ["Álvaro Rodríguez", "DEF", 74],
+    ["Riki Rodríguez", "MED", 75], ["Ale Meléndez", "MED", 74], ["Alberto Quiles", "MED", 76],
+    ["Higinio Marín", "DEL", 76], ["Jonathan Gómez", "DEL", 74], ["Juanma García", "DEL", 74],
+  ]],
+  ["Eldense", "ELD", "#16308f", "#d31230", "v", 1, 8000, 4, 40, [
+    ["Guille Vallejo", "ARQ", 73],
+    ["Dumi Abad", "DEF", 73], ["Iñigo Piña", "DEF", 73], ["Marc Mateu", "DEF", 74],
+    ["Sergio Ortuño", "MED", 74], ["Víctor García", "MED", 73], ["Clemente Montes", "MED", 74],
+    ["Mario Soberón", "DEL", 74], ["Iván Chapela", "DEL", 74], ["Florin Andone", "DEL", 74],
+  ]],
+  ["Málaga", "MGA", "#1668c7", "#f4f4f4", "v", 2, 30000, 6, 60, [
+    ["Alfonso Herrero", "ARQ", 76],
+    ["Einar Galilea", "DEF", 75], ["Nelson Monte", "DEF", 75], ["Víctor García", "DEF", 74],
+    ["Manu Molina", "MED", 75], ["Ramón Enríquez", "MED", 75], ["David Larrubia", "MED", 75],
+    ["Roberto Fernández", "DEL", 77], ["Dani Lorenzo", "DEL", 74], ["Antoñito Cordero", "DEL", 75],
+  ]],
+];
