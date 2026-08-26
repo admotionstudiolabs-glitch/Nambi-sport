@@ -15,6 +15,7 @@ export interface PlayerP {
   id: number; name: string; pos: Pos; med: number; age: number; value: number;
   energy: number; clubId: number; goals: number; matches: number; ratings: number[];
   isUser?: boolean; stats?: PlayerStats;
+  num: number; nat: string; wage: number; contract: number; injured: number; form: number; baseMed: number;
 }
 
 export interface Club {
@@ -67,10 +68,28 @@ export interface GameState {
   lastResult: MatchResult | null; lastWasHome: boolean;
   seasonDone: boolean; outcome: "win" | "lose" | null; outcomeTitle: string; outcomeText: string;
   awards: { ballon: string | null; club: number | null; goleador: string | null; clubG: number | null };
+  history: MatchRecord[];
+  eventLog: GameEvent[];
+  market: MarketPlayer[];
+  scoutUsed: boolean;
+  youthPromoted: boolean;
+  trainCount: number;
+}
+
+/* ================= PARTIDOS / EVENTOS / MERCADO ================= */
+export interface MatchRecord {
+  round: number; homeId: number; awayId: number; gh: number; ga: number;
+  comp: "liga" | "copa"; cupStage?: string; stats?: MatchStats; scorers: Scorer[];
+}
+export interface GameEvent { round: number; text: string; kind: "good" | "bad" | "info" }
+export interface MarketPlayer {
+  name: string; pos: Pos; med: number; age: number; num: number; nat: string;
+  price: number; hidden: boolean;
 }
 
 /* ================= LIGAS ================= */
-export type ClubRow = [string, string, string, string, "v" | "h" | "s", number, number, number, number, [string, Pos, number][]];
+export type PlayerRow = [string, Pos, number, number?, number?, string?];
+export type ClubRow = [string, string, string, string, "v" | "h" | "s", number, number, number, number, PlayerRow[]];
 export interface League { id: string; name: string; country: string; flag: string; rows: ClubRow[]; continental: string }
 
 export const LEAGUES: League[] = [
@@ -122,6 +141,7 @@ export function medFromStats(s: PlayerStats, pos: Pos): number {
 }
 
 export const valueOf = (med: number) => Math.round(Math.pow(Math.max(1, med - 52) / 10, 2.6) * 1.2 * 10) / 10;
+export const wageOf = (med: number) => Math.round(Math.pow(Math.max(1, med - 50) / 12, 2.2) * 100) / 100;
 
 export function statsFor(med: number, pos: Pos): PlayerStats {
   const j = () => Math.round((Math.random() - 0.5) * 6);

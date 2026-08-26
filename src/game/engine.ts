@@ -1,20 +1,37 @@
 import type {
   Club, CupState, CupTie, Fm, Fixture, GameState, MatchResult, Mode, PlayerP, PlayerStats, Pos, Role, Standing, Strength,
 } from "./core";
-import { COACHES, clamp, formationLayout, isClasico, leagueOf, medFromStats, statsFor, valueOf } from "./core";
+import { COACHES, clamp, formationLayout, isClasico, leagueOf, medFromStats, statsFor, valueOf, wageOf } from "./core";
+import type { GameEvent, MarketPlayer, MatchRecord } from "./core";
 
-const MARKET: { name: string; pos: Pos; med: number; age: number }[] = [
-  { name: "Ángel Di María", pos: "DEL", med: 86, age: 37 },
-  { name: "Leandro Paredes", pos: "MED", med: 85, age: 31 },
-  { name: "Nicolás Otamendi", pos: "DEF", med: 84, age: 37 },
-  { name: "Gerónimo Rulli", pos: "ARQ", med: 82, age: 33 },
-  { name: "Papu Gómez", pos: "MED", med: 80, age: 37 },
-  { name: "Lolo Benítez", pos: "MED", med: 71, age: 19 },
-  { name: "Tato Escobar", pos: "DEL", med: 72, age: 20 },
-  { name: "Nico Palavecino", pos: "DEF", med: 70, age: 19 },
-  { name: "Chino Ríos", pos: "ARQ", med: 69, age: 21 },
+const FREE_AGENTS: [string, Pos, number, number, string][] = [
+  ["Ángel Di María", "DEL", 86, 37, "🇦🇷"], ["Leandro Paredes", "MED", 85, 31, "🇦🇷"],
+  ["Nicolás Otamendi", "DEF", 84, 37, "🇦🇷"], ["Gerónimo Rulli", "ARQ", 82, 33, "🇦🇷"],
+  ["Papu Gómez", "MED", 80, 37, "🇦🇷"], ["Ramiro Funes Mori", "DEF", 77, 34, "🇦🇷"],
+  ["Éver Banega", "MED", 79, 36, "🇦🇷"], ["Lucas Alario", "DEL", 78, 32, "🇦🇷"],
+  ["Franco Cervi", "MED", 76, 30, "🇦🇷"], ["Matías Suárez", "DEL", 76, 36, "🇦🇷"],
 ];
-export const marketList = () => MARKET;
+const FIRST_NAMES = ["Thiago", "Mateo", "Bautista", "Luka", "Santiago", "Valentín", "Joaquín", "Simón", "Bruno", "Dante", "Facundo", "Nicolás", "Agustín", "Tomás", "Franco", "Gonzalo", "Emiliano", "Santiago", "Iker", "Dylan"];
+const LAST_NAMES = ["Romero", "Álvarez", "Benítez", "Gómez", "Fernández", "Díaz", "Torres", "Vargas", "Molina", "Castro", "Ríos", "Sosa", "Peralta", "Ibarra", "Quiroga", "Ledesma", "Herrera", "Aguirre", "Navarro", "Ojeda"];
+const NATIONS = ["🇦🇷", "🇵🇾", "🇪🇸", "🇺🇾", "🇧🇷", "🇨🇱", "🇨🇴", "🇲🇽", "🇪🇨", "🇵🇪"];
+
+function buildMarket(): MarketPlayer[] {
+  const out: MarketPlayer[] = FREE_AGENTS.map(([name, pos, med, age, nat]) => ({
+    name, pos, med, age, num: 0, nat, price: valueOf(med), hidden: false,
+  }));
+  const posPool: Pos[] = ["ARQ", "DEF", "DEF", "MED", "MED", "MED", "DEL", "DEL"];
+  for (let i = 0; i < 30; i++) {
+    const pos = posPool[Math.floor(Math.random() * posPool.length)];
+    const med = 62 + Math.floor(Math.random() * 20);
+    const age = 17 + Math.floor(Math.random() * 18);
+    const name = `${FIRST_NAMES[Math.floor(Math.random() * FIRST_NAMES.length)]} ${LAST_NAMES[Math.floor(Math.random() * LAST_NAMES.length)]}`;
+    out.push({
+      name, pos, med, age, num: 0, nat: NATIONS[Math.floor(Math.random() * NATIONS.length)],
+      price: valueOf(med), hidden: i % 3 === 0, // un tercio son "joyitas" que descubre el ojeador
+    });
+  }
+  return out.sort((a, b) => b.med - a.med);
+}
 
 let pid = 1;
 
@@ -28,20 +45,28 @@ export function buildSeason(mode: Mode, leagueId: string, clubId: number, name: 
     prestige: r[5], capacity: r[6], money: r[7], fans: r[8],
   }));
   for (let ci = 0; ci < league.rows.length; ci++) {
-    for (const [pname, ppos, med] of league.rows[ci][9]) {
+    let autoNum = 0;
+    for (const row of league.rows[ci][9]) {
+      const [pname, ppos, med, pnum, page, pnat] = row;
+      autoNum++;
+      const age = page ?? 17 + Math.floor(Math.random() * 19);
       players.push({
-        id: pid++, name: pname, pos: ppos, med, age: 17 + Math.floor(Math.random() * 19),
+        id: pid++, name: pname, pos: ppos, med, age,
         value: valueOf(med), energy: 100, clubId: ci, goals: 0, matches: 0, ratings: [],
         stats: statsFor(med, ppos),
+        num: pnum ?? autoNum, nat: pnat ?? "—", wage: wageOf(med),
+        contract: 1 + Math.floor(Math.random() * 4), injured: 0, form: 70, baseMed: med,
       });
     }
   }
   let userPlayerId = -1;
   if (mode === "player") {
     const stats: PlayerStats = { tiro: 68, pase: 66, regate: 70, ritmo: 72, defensa: 55, fisico: 64 };
+    const med = medFromStats(stats, pos);
     const me: PlayerP = {
-      id: pid++, name, pos, med: medFromStats(stats, pos), age: 19, value: valueOf(68),
+      id: pid++, name, pos, med, age: 19, value: valueOf(68),
       energy: 100, clubId, goals: 0, matches: 0, ratings: [], isUser: true, stats,
+      num: 10, nat: league.country, wage: wageOf(med), contract: 3, injured: 0, form: 70, baseMed: med,
     };
     players.push(me);
     userPlayerId = me.id;
@@ -66,6 +91,7 @@ export function buildSeason(mode: Mode, leagueId: string, clubId: number, name: 
     lastResult: null, lastWasHome: true,
     seasonDone: false, outcome: null, outcomeTitle: "", outcomeText: "",
     awards: { ballon: null, club: null, goleador: null, clubG: null },
+    history: [], eventLog: [], market: buildMarket(), scoutUsed: false, youthPromoted: false, trainCount: 0,
   };
 }
 
@@ -285,7 +311,7 @@ export function closeRound(g: GameState, res: MatchResult, fx: Fixture, usedIds:
   const attendance = Math.round(club.capacity * (club.fans / 100) * (isHome ? 1 : 0.35));
   income += (attendance * g.pres.ticket) / 1e6 * 4;
   if (g.pres.sponsor) income += g.pres.sponsor.perMatch;
-  const wages = squadOf(g, g.userClub).reduce((s, p) => s + p.value * 0.006, 0);
+  const wages = squadOf(g, g.userClub).reduce((s, p) => s + (p.wage || wageOf(p.med)), 0);
   expense += wages + (g.mode === "president" ? 0.8 : 0.4);
   club.money = Math.round((club.money + income - expense) * 10) / 10;
   g.incomeLast = income; g.expenseLast = expense;
@@ -299,8 +325,20 @@ export function closeRound(g: GameState, res: MatchResult, fx: Fixture, usedIds:
 
   g.lastResult = res;
   g.lastWasHome = isHome;
+
+  // historial del partido del usuario
+  recordMatch(g, {
+    round: g.round, homeId: fx.home, awayId: fx.away, gh: res.gh, ga: res.ga,
+    comp: "liga", stats: res.stats, scorers: res.scorers,
+  });
+
   g.round++;
   g.dt.trained = false;
+  g.trainCount = 0;
+  g.scoutUsed = false;
+
+  // lesiones, forma, contratos, eventos inesperados
+  processRound(g, ids);
 
   if (g.round >= g.totalRounds) startCup(g);
   else if (g.mode === "dt" && g.dt.patience <= 0) finishAll(g);
@@ -359,6 +397,10 @@ export function playCupRound(g: GameState): MatchResult | null {
         { min: 90, text: `${stageName} — ${hClub.name} ${tie.gh} - ${tie.ga} ${aClub.name}. ${isHome ? (tie.gh! > tie.ga! ? "¡Tu equipo avanza!" : "Eliminado de la copa.") : tie.ga! > tie.gh! ? "¡Tu equipo avanza!" : "Eliminado de la copa."}`, kind: "info" as const, club: -1 },
       ];
       userRes = { gh: tie.gh!, ga: tie.ga!, events, scorers: [], cards: 2, cup: true, cupLabel: `${c.name} — ${stageName}` };
+      recordMatch(g, {
+        round: g.round, homeId: tie.home, awayId: tie.away, gh: tie.gh!, ga: tie.ga!,
+        comp: "copa", cupStage: stageName, scorers: [],
+      });
     }
   }
   // siguiente ronda
@@ -462,18 +504,154 @@ export function trainLine(g: GameState, pos: Pos) {
 
 /* ================= MERCADO ================= */
 export function buyPlayer(g: GameState, idx: number): boolean {
-  const target = MARKET[idx];
+  const target = g.market[idx];
   if (!target) return false;
-  const cost = valueOf(target.med);
+  const cost = target.price;
   if (clubMoney(g) < cost) return false;
   setClubMoney(g, clubMoney(g) - cost);
+  const med = target.med;
   g.players.push({
-    id: pid++, name: target.name, pos: target.pos, med: target.med, age: target.age,
+    id: pid++, name: target.name, pos: target.pos, med, age: target.age,
     value: cost, energy: 100, clubId: g.userClub, goals: 0, matches: 0, ratings: [],
-    stats: statsFor(target.med, target.pos),
+    stats: statsFor(med, target.pos),
+    num: 0, nat: target.nat, wage: wageOf(med), contract: 3, injured: 0, form: 70, baseMed: med,
   });
-  MARKET.splice(idx, 1);
+  g.market.splice(idx, 1);
+  pushEvent(g, `FICHAJE: llegó ${target.name} (${target.pos} · ${med}) por $${cost}M.`, "good");
   return true;
+}
+
+/* ================= VENDER JUGADOR ================= */
+export function sellPlayer(g: GameState, playerId: number): boolean {
+  const p = g.players.find((x) => x.id === playerId);
+  if (!p || p.isUser) return false;
+  if (squadOf(g, g.userClub).length <= 14) return false; // plantel mínimo
+  const fee = Math.round(p.value * (0.85 + Math.random() * 0.3) * 10) / 10;
+  setClubMoney(g, clubMoney(g) + fee);
+  g.players = g.players.filter((x) => x.id !== playerId);
+  pushEvent(g, `VENTA: ${p.name} se fue por $${fee}M. La dirigencia respira.`, "info");
+  return true;
+}
+
+/* ================= RENOVACIÓN / CONTRATO ================= */
+export function negotiateContract(g: GameState, playerId: number): boolean {
+  const p = g.players.find((x) => x.id === playerId);
+  if (!p) return false;
+  const rise = Math.round(p.wage * 0.25 * 100) / 100;
+  const cost = Math.round(p.value * 0.12 * 10) / 10; // prima de renovación
+  if (clubMoney(g) < cost) return false;
+  setClubMoney(g, clubMoney(g) - cost);
+  p.wage = Math.round((p.wage + rise) * 100) / 100;
+  p.contract = 3 + Math.floor(Math.random() * 2);
+  pushEvent(g, `CONTRATO: ${p.name} renovó hasta ${p.contract} temporadas (+$${rise}M/fecha).`, "good");
+  return true;
+}
+
+/* ================= OJEADOR ================= */
+export function scoutAction(g: GameState): MarketPlayer | null {
+  if (g.scoutUsed) return null;
+  const cost = 1.5;
+  if (clubMoney(g) < cost) return null;
+  const hidden = g.market.filter((m) => m.hidden);
+  if (!hidden.length) return null;
+  setClubMoney(g, clubMoney(g) - cost);
+  g.scoutUsed = true;
+  const found = hidden[Math.floor(Math.random() * hidden.length)];
+  found.hidden = false;
+  pushEvent(g, `OJEADOR: descubrió a ${found.name} (${found.pos} · ${found.med}, ${found.age} años). ¡Joyita!`, "good");
+  return found;
+}
+
+/* ================= CANTERA ================= */
+export function promoteYouth(g: GameState): PlayerP | null {
+  if (g.youthPromoted) return null;
+  g.youthPromoted = true;
+  const pos: Pos = (["DEF", "MED", "DEL"] as Pos[])[Math.floor(Math.random() * 3)];
+  const med = 60 + Math.floor(Math.random() * 10);
+  const name = `${FIRST_NAMES[Math.floor(Math.random() * FIRST_NAMES.length)]} ${LAST_NAMES[Math.floor(Math.random() * LAST_NAMES.length)]}`;
+  const nat = leagueOf(g.leagueId).country;
+  const youth: PlayerP = {
+    id: pid++, name, pos, med, age: 17, value: valueOf(med), energy: 100, clubId: g.userClub,
+    goals: 0, matches: 0, ratings: [], stats: statsFor(med, pos),
+    num: 0, nat, wage: wageOf(med), contract: 3, injured: 0, form: 75, baseMed: med,
+  };
+  g.players.push(youth);
+  pushEvent(g, `CANTERA: subió ${name} (${pos} · ${med}), la joya de la reserva.`, "good");
+  return youth;
+}
+
+/* ================= ENTRENAMIENTO INDIVIDUAL ================= */
+export function trainPlayer(g: GameState, playerId: number, stat: keyof PlayerStats): boolean {
+  const p = g.players.find((x) => x.id === playerId);
+  if (!p || !p.stats) return false;
+  if (g.trainCount >= 3) return false; // 3 sesiones por fecha
+  const cost = 0.4;
+  if (clubMoney(g) < cost) return false;
+  setClubMoney(g, clubMoney(g) - cost);
+  g.trainCount++;
+  p.stats[stat] = Math.min(94, p.stats[stat] + 1);
+  p.med = medFromStats(p.stats, p.pos);
+  p.value = valueOf(p.med);
+  return true;
+}
+
+/* ================= EVENTOS ================= */
+export function pushEvent(g: GameState, text: string, kind: GameEvent["kind"]) {
+  g.eventLog.unshift({ round: g.round, text, kind });
+  if (g.eventLog.length > 40) g.eventLog.pop();
+}
+
+/* lesiones + forma + contratos al cerrar fecha */
+export function processRound(g: GameState, playedIds: number[]) {
+  // lesiones aleatorias
+  const squad = squadOf(g, g.userClub);
+  for (const p of squad) {
+    if (p.injured > 0) { p.injured--; continue; }
+    const risk = playedIds.includes(p.id) ? 0.06 : 0.015;
+    if (Math.random() < risk) {
+      p.injured = 1 + Math.floor(Math.random() * 5);
+      pushEvent(g, `LESIÓN: ${p.name} se rompió en la semana. ${p.injured} fecha(s) afuera.`, "bad");
+    }
+  }
+  // forma según resultado y medias que derivan
+  const res = g.lastResult;
+  const won = res ? (g.lastWasHome ? res.gh > res.ga : res.ga > res.gh) : false;
+  const lost = res ? (g.lastWasHome ? res.gh < res.ga : res.ga < res.gh) : false;
+  for (const p of squad) {
+    if (!playedIds.includes(p.id)) continue;
+    p.form = clamp(p.form + (won ? 4 : lost ? -4 : 1) + Math.round((Math.random() - 0.5) * 4), 30, 99);
+    // la media se mueve con la forma y la edad
+    const drift = (p.form - 70) / 40 + (p.age < 24 ? 0.4 : p.age > 32 ? -0.4 : 0);
+    const newMed = Math.round(clamp(p.baseMed + drift, 55, 95));
+    if (newMed !== p.med) { p.med = newMed; p.value = valueOf(p.med); p.wage = wageOf(p.med); }
+  }
+  // contratos que vencen
+  for (const p of squad) {
+    if (p.contract > 0) p.contract--;
+    if (p.contract === 0 && !p.isUser && Math.random() < 0.4) {
+      g.players = g.players.filter((x) => x.id !== p.id);
+      pushEvent(g, `CONTRATO: ${p.name} quedó libre y se fue sin dejar un peso.`, "bad");
+    }
+  }
+  // eventos inesperados
+  const roll = Math.random();
+  if (roll < 0.12) {
+    const bonus = 1 + Math.round(Math.random() * 3);
+    setClubMoney(g, clubMoney(g) + bonus);
+    pushEvent(g, `SPONSOR SORPRESA: una marca pagó $${bonus}M por publicidad en la camiseta.`, "good");
+  } else if (roll < 0.2) {
+    setClubFans(g, getClub(g, g.userClub).fans + 2);
+    pushEvent(g, `LA HINCHADA se ilusiona: +2 de popularidad tras la última fecha.`, "good");
+  } else if (roll < 0.26) {
+    setClubMoney(g, clubMoney(g) - 1);
+    pushEvent(g, `MULTA: el tribunal disciplinario sancionó al club con $1M.`, "bad");
+  }
+}
+
+/* ================= HISTORIAL ================= */
+export function recordMatch(g: GameState, rec: MatchRecord) {
+  g.history.unshift(rec);
+  if (g.history.length > 60) g.history.pop();
 }
 
 export const coachCandidates = () => COACHES;

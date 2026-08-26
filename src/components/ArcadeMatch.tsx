@@ -141,10 +141,11 @@ export default function ArcadeMatch(props: Props) {
       s.graceT = 0.5;
     };
 
-    const shoot = (idx: number, power: number, acc2: number) => {
+    const shoot = (idx: number, power: number, acc2: number, isUser = false) => {
       const s = st.current; const e = s.ents[idx];
       const gx = e.team === 0 ? W - 14 : 14;
-      const spread = clamp(140 - acc2 * 0.9, 16, 105);
+      // el usuario apunta mucho mejor: dispersión chica y centrada al arco
+      const spread = isUser ? clamp(66 - acc2 * 0.5, 6, 40) : clamp(140 - acc2 * 0.9, 16, 105);
       const ty = H / 2 + (Math.random() * 2 - 1) * spread;
       const dx = gx - s.ball.x, dy = ty - s.ball.y;
       const dl = Math.hypot(dx, dy) || 1;
@@ -198,8 +199,8 @@ export default function ArcadeMatch(props: Props) {
       if (pulse.current.shoot) {
         pulse.current.shoot = false;
         if (isOwner && me.kickCd <= 0) {
-          const r9 = pr.role === "P9" ? 560 : 620;
-          if (me.x > r9) shoot(meIdx, 640 + (me.p.stats?.tiro ?? 68) * 3, me.p.stats?.tiro ?? 68);
+          const r9 = pr.role === "P9" ? 430 : 490;
+          if (me.x > r9) shoot(meIdx, 690 + (me.p.stats?.tiro ?? 68) * 3.2, me.p.stats?.tiro ?? 68, true);
           else {
             // pase al compañero más adelantado
             const mates = s.ents.map((o, oi) => ({ o, oi })).filter(({ o }) => o.team === 0 && !o.isGk && o !== me);
@@ -368,8 +369,10 @@ export default function ArcadeMatch(props: Props) {
           const planeX = side === 0 ? W - 60 : 60;
           if ((side === 0 && b.x > planeX && b.vx > 0) || (side === 1 && b.x < planeX && b.vx < 0)) {
             const gk = s.ents.find((e) => e.team === (1 - side) && e.isGk);
-            if (gk && Math.abs(b.y - gk.y) < 30 + (gk.p.med - 70) * 0.5) {
-              const shooter = s.ents[b.lastTouch];
+            const shooter = s.ents[b.lastTouch];
+            // al usuario le atajan menos: el alcance del arquero se reduce contra tus tiros
+            const gkReach = shooter?.isUser ? 15 + (gk ? (gk.p.med - 70) * 0.3 : 0) : 30 + (gk ? (gk.p.med - 70) * 0.5 : 0);
+            if (gk && Math.abs(b.y - gk.y) < gkReach) {
               if (shooter?.isUser) s.events.unshift({ min: Math.floor(s.min), text: `¡Te la sacó ${lastName(gk.p.name)}! Voló el arquero.`, kind: "chance", club: pr.away.id });
               b.vx = (side === 0 ? -1 : 1) * (200 + Math.random() * 150);
               b.vy = (Math.random() - 0.5) * 300;

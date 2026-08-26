@@ -7,13 +7,13 @@ import type { Fm, GameState, PlayerP, Pos } from "../game/core";
 import { ROLES, isClasico, roleOf, valueOf } from "../game/core";
 import {
   buyPlayer, changeRole, clubMoney, computeNews, cupName, getClub, isKeyMatch, jumpToKeyMatch,
-  leagueName, marketList, setUserXI, simDateQuick, simRestOfSeason, sortedTable,
-  squadOf, trainLine, userCupTie, userInCup, userNextFixture, xiOf,
+  leagueName, negotiateContract, promoteYouth, scoutAction, sellPlayer, setUserXI, simDateQuick,
+  simRestOfSeason, sortedTable, squadOf, trainLine, trainPlayer, userCupTie, userInCup, userNextFixture, xiOf,
 } from "../game/engine";
 import { sfx } from "../game/audio";
 import { Crest, MedBadge, PosTag } from "../components/ui";
 
-type Tab = "plantel" | "tacticas" | "finanzas" | "carrera" | "mercado" | "liga" | "copa";
+type Tab = "plantel" | "tacticas" | "finanzas" | "carrera" | "mercado" | "club" | "historial" | "liga" | "copa";
 
 export function Hub({ g, refresh, onPlayLive, onCupRound, onHelp, muted, onMute }: {
   g: GameState; refresh: () => void; onPlayLive: () => void; onCupRound: () => void;
@@ -35,6 +35,8 @@ export function Hub({ g, refresh, onPlayLive, onCupRound, onHelp, muted, onMute 
     { id: "carrera", label: "CARRERA", icon: <UserRound size={16} />, show: g.mode === "player" },
     { id: "finanzas", label: g.mode === "president" ? "OFICINA" : "FINANZAS", icon: g.mode === "president" ? <Landmark size={16} /> : <Coins size={16} />, show: g.mode !== "player" },
     { id: "mercado", label: "MERCADO", icon: <TrendingUp size={16} />, show: g.mode !== "player" },
+    { id: "club", label: "CLUB", icon: <Sparkles size={16} />, show: g.mode !== "player" },
+    { id: "historial", label: "HISTORIAL", icon: <Newspaper size={16} />, show: true },
     { id: "liga", label: "LIGA", icon: <ListOrdered size={16} />, show: true },
     { id: "copa", label: "COPA", icon: <Trophy size={16} />, show: !!g.cup },
   ];
@@ -152,11 +154,13 @@ export function Hub({ g, refresh, onPlayLive, onCupRound, onHelp, muted, onMute 
           ))}
         </div>
 
-        {tab === "plantel" && <SquadTab g={g} />}
+        {tab === "plantel" && <SquadTab g={g} refresh={refresh} />}
         {tab === "tacticas" && g.mode === "dt" && <TacticsTab g={g} refresh={refresh} />}
         {tab === "carrera" && g.mode === "player" && <CareerTab g={g} refresh={refresh} />}
         {tab === "finanzas" && g.mode !== "player" && <FinanceTab g={g} refresh={refresh} />}
         {tab === "mercado" && g.mode !== "player" && <MarketTab g={g} refresh={refresh} />}
+        {tab === "club" && g.mode !== "player" && <ClubOfficeTab g={g} refresh={refresh} />}
+        {tab === "historial" && <HistoryTab g={g} />}
         {tab === "liga" && <LeagueTab g={g} />}
         {tab === "copa" && g.cup && <CupTab g={g} />}
       </div>
@@ -165,35 +169,82 @@ export function Hub({ g, refresh, onPlayLive, onCupRound, onHelp, muted, onMute 
 }
 
 /* ---------------- PLANTEL ---------------- */
-function SquadTab({ g }: { g: GameState }) {
+function SquadTab({ g, refresh }: { g: GameState; refresh: () => void }) {
+  const [showTrain, setShowTrain] = useState<number | null>(null);
   const squad = [...squadOf(g, g.userClub)].sort((a, b) => {
     const order = { ARQ: 0, DEF: 1, MED: 2, DEL: 3 };
     return order[a.pos] - order[b.pos] || b.med - a.med;
   });
+  const canManage = g.mode !== "player";
   return (
     <div className="panel p-5 animate-risein">
-      <div className="flex justify-between items-center mb-3">
+      <div className="flex justify-between items-center mb-1 flex-wrap gap-2">
         <h3 className="font-display text-3xl tracking-wide">PLANTEL <span className="text-lima">({squad.length})</span></h3>
-        <span className="text-xs text-chalk/50">Media del equipo: <b className="text-lima">{Math.round(squad.reduce((s, p) => s + p.med, 0) / (squad.length || 1))}</b></span>
+        <div className="flex items-center gap-3 text-xs text-chalk/50">
+          <span>Media: <b className="text-lima">{Math.round(squad.reduce((s, p) => s + p.med, 0) / (squad.length || 1))}</b></span>
+          <span>Salarios/fecha: <b className="text-gold">${squad.reduce((s, p) => s + (p.wage || 0), 0).toFixed(1)}M</b></span>
+        </div>
       </div>
+      <p className="text-xs text-chalk/40 mb-3">Entrenamientos de esta fecha: <b className="text-lima">{3 - g.trainCount}</b> restantes · Venta mínima de plantel: 14.</p>
       <div className="overflow-x-auto">
         <table className="tbl w-full text-sm">
-          <thead><tr><th></th><th>JUGADOR</th><th>PUESTO</th><th>MEDIA</th><th>EDAD</th><th>ENERGÍA</th><th>GOLES</th><th>VALOR</th></tr></thead>
+          <thead><tr><th>#</th><th>JUGADOR</th><th>POS</th><th>MED</th><th>EDAD</th><th>FORMA</th><th>ENERGÍA</th><th>SALARIO</th><th>CONTRATO</th><th>GOLES</th><th>VALOR</th>{canManage && <th>ACCIONES</th>}</tr></thead>
           <tbody>
             {squad.map((p) => (
               <tr key={p.id} className={p.isUser ? "user-row" : ""}>
-                <td className="font-display text-chalk/40">{p.isUser ? "★" : ""}</td>
-                <td className="font-semibold">{p.name}</td>
+                <td className="font-display text-chalk/60">{p.num || "—"}</td>
+                <td>
+                  <span className="font-semibold">{p.name}</span>
+                  <span className="ml-1.5 text-xs">{p.nat}</span>
+                  {p.injured > 0 && <span className="ml-1.5 text-xs font-bold text-hot">🏥 {p.injured}f</span>}
+                </td>
                 <td><PosTag pos={p.pos} /></td>
-                <td><MedBadge med={p.med} /></td>
+                <td>
+                  <MedBadge med={p.med} />
+                  {p.med > p.baseMed && <span className="ml-1 text-[10px] text-lima">▲</span>}
+                  {p.med < p.baseMed && <span className="ml-1 text-[10px] text-hot">▼</span>}
+                </td>
                 <td>{p.age}</td>
                 <td>
-                  <div className="w-20 h-2 inline-block align-middle" style={{ background: "rgba(3,13,7,0.7)", border: "1px solid rgba(242,255,233,0.15)" }}>
+                  <span className="font-display" style={{ color: p.form >= 75 ? "#b8ff2e" : p.form >= 60 ? "#ffc233" : "#ff4257" }}>{p.form}</span>
+                </td>
+                <td>
+                  <div className="w-16 h-2 inline-block align-middle" style={{ background: "rgba(3,13,7,0.7)", border: "1px solid rgba(242,255,233,0.15)" }}>
                     <div className="h-full" style={{ width: `${p.energy}%`, background: p.energy > 40 ? "#b8ff2e" : "#ff4257" }} />
                   </div>
                 </td>
+                <td className="text-chalk/70">${(p.wage || 0).toFixed(1)}M</td>
+                <td className={p.contract <= 1 ? "text-hot font-bold" : "text-chalk/70"}>{p.contract}t</td>
                 <td className="font-display text-lg text-lima">{p.goals}</td>
                 <td className="text-gold">${p.value}M</td>
+                {canManage && (
+                  <td>
+                    <div className="flex gap-1 flex-wrap">
+                      <button className="btn btn-ghost px-2 py-0.5 text-xs" title="Renovar contrato"
+                        onClick={() => { if (negotiateContract(g, p.id)) { refresh(); sfx.coins(); } }}>
+                        <span>✍️</span>
+                      </button>
+                      <button className="btn btn-ghost px-2 py-0.5 text-xs" title="Entrenar (+1 atributo)"
+                        onClick={() => { setShowTrain(showTrain === p.id ? null : p.id); sfx.click(); }}>
+                        <span>🏋️</span>
+                      </button>
+                      <button className="btn btn-hot px-2 py-0.5 text-xs" title="Vender" disabled={squad.length <= 14}
+                        onClick={() => { if (sellPlayer(g, p.id)) { refresh(); sfx.coins(); } }}>
+                        <span>$</span>
+                      </button>
+                    </div>
+                    {showTrain === p.id && p.stats && (
+                      <div className="mt-1 flex gap-1">
+                        {(["tiro", "pase", "regate", "ritmo", "defensa", "fisico"] as const).map((stt) => (
+                          <button key={stt} className="btn btn-lima px-1.5 py-0.5 text-[10px]" disabled={g.trainCount >= 3}
+                            onClick={() => { if (trainPlayer(g, p.id, stt)) { refresh(); sfx.kick(); } }}>
+                            <span>{stt.slice(0, 3)}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
@@ -423,28 +474,153 @@ function FinanceTab({ g, refresh }: { g: GameState; refresh: () => void }) {
 
 /* ---------------- MERCADO ---------------- */
 function MarketTab({ g, refresh }: { g: GameState; refresh: () => void }) {
-  const market = marketList();
+  const [query, setQuery] = useState("");
+  const market = g.market;
+  const q = query.trim().toLowerCase();
+  const shown = market
+    .map((m, i) => ({ m, i }))
+    .filter(({ m }) => !q || m.name.toLowerCase().includes(q) || m.pos.toLowerCase().includes(q) || m.nat.includes(q));
   return (
     <div className="panel p-5 animate-risein">
-      <h3 className="font-display text-3xl tracking-wide mb-1">MERCADO DE <span className="text-gold">PASES</span></h3>
-      <p className="text-sm text-chalk/60 mb-4">Libres de lujo y pibes de proyección. Plata disponible: <b className="text-gold">${clubMoney(g).toFixed(1)}M</b>.</p>
-      <div className="grid md:grid-cols-2 gap-2">
-        {market.map((m, i) => (
-          <div key={m.name} className="panel-soft p-3 flex items-center gap-3">
-            <PosTag pos={m.pos} />
-            <div className="flex-1">
-              <div className="font-semibold">{m.name}</div>
-              <div className="text-xs text-chalk/50">{m.age} años · libre</div>
-            </div>
-            <MedBadge med={m.med} />
-            <button className="btn btn-gold px-4 py-1.5 text-sm" disabled={clubMoney(g) < valueOf(m.med)}
-              onClick={() => { if (buyPlayer(g, i)) { refresh(); sfx.coins(); } }}>
-              <span>${valueOf(m.med)}M</span>
-            </button>
-          </div>
-        ))}
-        {!market.length && <p className="text-chalk/50">Mercado cerrado: ya compraste todo lo que había.</p>}
+      <div className="flex justify-between items-center flex-wrap gap-2 mb-1">
+        <h3 className="font-display text-3xl tracking-wide">MERCADO DE <span className="text-gold">PASES</span></h3>
+        <span className="text-sm text-chalk/60">Disponible: <b className="text-gold">${clubMoney(g).toFixed(1)}M</b></span>
       </div>
+      <p className="text-sm text-chalk/50 mb-3">Los jugadores con <span className="text-cielo">?</span> son joyitas ocultas: mandá al <b className="text-cielo">ojeador</b> (pestaña CLUB) a descubrirlas.</p>
+      <input type="text" placeholder="Buscar por nombre, puesto o país…" value={query} onChange={(e) => setQuery(e.target.value)} className="w-full mb-4" />
+      <div className="grid md:grid-cols-2 gap-2">
+        {shown.map(({ m, i }) => (
+          m.hidden ? (
+            <div key={`h-${i}`} className="panel-soft p-3 flex items-center gap-3 opacity-70">
+              <PosTag pos={m.pos} />
+              <div className="flex-1">
+                <div className="font-semibold text-cielo">¿ ? ¿</div>
+                <div className="text-xs text-chalk/50">Talento sin descubrir · {m.age} años</div>
+              </div>
+              <span className="font-display text-2xl text-cielo">?</span>
+            </div>
+          ) : (
+            <div key={`${m.name}-${i}`} className="panel-soft p-3 flex items-center gap-3">
+              <PosTag pos={m.pos} />
+              <div className="flex-1 min-w-0">
+                <div className="font-semibold truncate">{m.name} <span className="text-xs">{m.nat}</span></div>
+                <div className="text-xs text-chalk/50">{m.age} años · libre</div>
+              </div>
+              <MedBadge med={m.med} />
+              <button className="btn btn-gold px-4 py-1.5 text-sm" disabled={clubMoney(g) < m.price}
+                onClick={() => { if (buyPlayer(g, i)) { refresh(); sfx.coins(); } }}>
+                <span>${m.price}M</span>
+              </button>
+            </div>
+          )
+        ))}
+        {!shown.length && <p className="text-chalk/50">Nadie coincide con la búsqueda.</p>}
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- CLUB (OJEADOR / CANTERA / EVENTOS) ---------------- */
+function ClubOfficeTab({ g, refresh }: { g: GameState; refresh: () => void }) {
+  return (
+    <div className="grid lg:grid-cols-2 gap-5">
+      <div className="space-y-5">
+        <div className="panel p-5 animate-risein">
+          <h3 className="font-display text-3xl tracking-wide mb-2">OJEADOR <span className="text-cielo">🔭</span></h3>
+          <p className="text-sm text-chalk/60 mb-3">Mandalo a buscar talentos por $1.5M. Descubre una joyita oculta del mercado (1 vez por fecha).</p>
+          <button className="btn btn-cielo px-6 py-2.5" disabled={g.scoutUsed || clubMoney(g) < 1.5}
+            onClick={() => { scoutAction(g); refresh(); sfx.tab(); }}>
+            <span>{g.scoutUsed ? "YA VOLVIÓ ESTA FECHA" : "MANDAR OJEADOR · $1.5M"}</span>
+          </button>
+        </div>
+        <div className="panel p-5 animate-risein">
+          <h3 className="font-display text-3xl tracking-wide mb-2">CANTERA <span className="text-lima">🌱</span></h3>
+          <p className="text-sm text-chalk/60 mb-3">Subí a un juvenil de la reserva al primer equipo. Gratis, 1 vez por temporada.</p>
+          <button className="btn btn-lima px-6 py-2.5" disabled={g.youthPromoted}
+            onClick={() => { promoteYouth(g); refresh(); sfx.coins(); }}>
+            <span>{g.youthPromoted ? "YA SUBISTE UNO ESTA TEMPORADA" : "PROMOVER JUVENIL"}</span>
+          </button>
+        </div>
+      </div>
+      <div className="panel p-5 animate-risein">
+        <h3 className="font-display text-3xl tracking-wide mb-3">NOVEDADES DEL <span className="text-gold">CLUB</span></h3>
+        <div className="space-y-2 max-h-[480px] overflow-y-auto pr-1">
+          {g.eventLog.length === 0 && <p className="text-chalk/50 text-sm">Todavía no pasó nada. Jugá fechas y acá van a caer lesiones, fichajes, multas y sorpresas.</p>}
+          {g.eventLog.map((ev, i) => (
+            <div key={i} className={`panel-soft p-2.5 text-sm flex gap-2 items-start ${i === 0 ? "animate-risein" : ""}`}>
+              <span className="font-display shrink-0 mt-0.5" style={{ color: ev.kind === "good" ? "#b8ff2e" : ev.kind === "bad" ? "#ff4257" : "#41d6ff" }}>F{ev.round + 1}</span>
+              <span className="text-chalk/80">{ev.text}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- HISTORIAL ---------------- */
+function HistoryTab({ g }: { g: GameState }) {
+  const [sel, setSel] = useState<number | null>(null);
+  return (
+    <div className="panel p-5 animate-risein">
+      <h3 className="font-display text-3xl tracking-wide mb-3">PARTIDOS <span className="text-lima">JUGADOS</span></h3>
+      {g.history.length === 0 && <p className="text-chalk/50 text-sm">Aún no jugaste ningún partido.</p>}
+      <div className="space-y-2">
+        {g.history.map((rec, i) => {
+          const home = getClub(g, rec.homeId), away = getClub(g, rec.awayId);
+          const userWon = (rec.homeId === g.userClub && rec.gh > rec.ga) || (rec.awayId === g.userClub && rec.ga > rec.gh);
+          const userLost = (rec.homeId === g.userClub && rec.gh < rec.ga) || (rec.awayId === g.userClub && rec.ga < rec.gh);
+          const open = sel === i;
+          return (
+            <div key={i}>
+              <button className="w-full panel-soft p-3 flex items-center gap-3 text-left hover:border-lima/40 transition-colors" onClick={() => { setSel(open ? null : i); sfx.click(); }}>
+                <span className="chip shrink-0" style={{ background: rec.comp === "copa" ? "rgba(255,194,51,0.15)" : "rgba(184,255,46,0.12)", color: rec.comp === "copa" ? "#ffc233" : "#b8ff2e" }}>
+                  {rec.comp === "copa" ? rec.cupStage ?? "COPA" : `F${rec.round + 1}`}
+                </span>
+                <span className="flex-1 font-semibold text-sm flex items-center gap-2 min-w-0">
+                  <Crest club={home} size={20} /><span className="truncate">{home.short}</span>
+                  <span className="font-display text-xl text-chalk/80">{rec.gh}-{rec.ga}</span>
+                  <span className="truncate">{away.short}</span><Crest club={away} size={20} />
+                </span>
+                <span className="font-display text-lg shrink-0" style={{ color: userWon ? "#b8ff2e" : userLost ? "#ff4257" : "#ffc233" }}>
+                  {userWon ? "V" : userLost ? "D" : "E"}
+                </span>
+              </button>
+              {open && (
+                <div className="panel-soft p-3 mt-1 animate-risein">
+                  {rec.scorers.length > 0 && (
+                    <div className="mb-2">
+                      <div className="text-[11px] uppercase tracking-widest text-chalk/50 mb-1">Goleadores</div>
+                      {rec.scorers.map((sc, j) => (
+                        <div key={j} className="text-sm text-chalk/80">⚽ {sc.min}' — {sc.name} ({getClub(g, sc.club).short})</div>
+                      ))}
+                    </div>
+                  )}
+                  {rec.stats ? (
+                    <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm">
+                      <StatRowMini label="Posesión" a={`${rec.stats.possH}%`} b={`${rec.stats.possA}%`} />
+                      <StatRowMini label="Tiros" a={rec.stats.shotsH} b={rec.stats.shotsA} />
+                      <StatRowMini label="Al arco" a={rec.stats.onH} b={rec.stats.onA} />
+                      <StatRowMini label="Pases" a={rec.stats.passesH} b={rec.stats.passesA} />
+                      <StatRowMini label="Faltas" a={rec.stats.foulsH} b={rec.stats.foulsA} />
+                    </div>
+                  ) : <p className="text-chalk/50 text-sm">Sin estadísticas detalladas (partido simulado).</p>}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function StatRowMini({ label, a, b }: { label: string; a: number | string; b: number | string }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="font-display text-lima w-10 text-right">{a}</span>
+      <span className="flex-1 text-[10px] uppercase tracking-widest text-chalk/45 text-center">{label}</span>
+      <span className="font-display text-chalk/60 w-10">{b}</span>
     </div>
   );
 }
