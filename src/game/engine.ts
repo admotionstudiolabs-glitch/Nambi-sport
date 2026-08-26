@@ -478,25 +478,73 @@ export function buyPlayer(g: GameState, idx: number): boolean {
 
 export const coachCandidates = () => COACHES;
 
-/* ================= GUARDADO ================= */
+/* ================= GUARDADO (a prueba de versiones) ================= */
 const SAVE_KEY = "nambi_sport_save_v3";
+const LEGACY_KEYS = ["nambi_sport_save_v2", "nambi_sport_save_v1", "nambi_sport_save"];
+
 export function saveSeason(g: GameState): boolean {
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(g)); return true; } catch { return false; }
 }
+
+/* migra guardados viejos al formato actual: nunca se pierde una temporada */
+function migrate(raw: string): GameState | null {
+  let g: GameState;
+  try { g = JSON.parse(raw) as GameState; } catch { return null; }
+  if (!g || !Array.isArray(g.players) || !Array.isArray(g.fixtures)) return null;
+
+  // campos que pudieron no existir en versiones anteriores
+  if (!g.leagueId) g.leagueId = "ar1";
+  if (!g.clubs) {
+    const rows = leagueOf(g.leagueId).rows;
+    g.clubs = rows.map((r, i) => ({
+      id: i, name: r[0], short: r[1], c1: r[2], c2: r[3], stripe: r[4],
+      prestige: r[5], capacity: r[6], money: r[7], fans: r[8],
+    }));
+  }
+  if (!g.phase) g.phase = g.seasonDone ? "done" : g.round >= g.totalRounds ? "cup" : "league";
+  if (g.cup === undefined) g.cup = null;
+  if (!g.awards) g.awards = { ballon: null, club: null, goleador: null, clubG: null };
+  if (g.userXI === undefined) g.userXI = null;
+  if (!g.userRole) g.userRole = g.userPos === "DEF" ? "DFC" : g.userPos === "MED" ? "MC" : "P9";
+  if (!g.userPos) g.userPos = "DEL";
+  if (!g.standings) {
+    g.standings = {};
+    g.clubs.forEach((c) => { g.standings[c.id] = { pts: 0, pj: 0, gf: 0, gc: 0 }; });
+  }
+  if (!g.topScorers) g.topScorers = [];
+  if (!g.dt) g.dt = { formation: "4-3-3", mentality: 1, pressing: 1, patience: 70, expectPos: 5, boostPos: null, boostAmt: 0, trained: false };
+  if (!g.pres) g.pres = { ticket: 3, sponsor: null, coachName: "Don Menotti Jr.", coachBonus: 1, stadiumLvl: 1 };
+  if (typeof g.incomeLast !== "number") g.incomeLast = 0;
+  if (typeof g.expenseLast !== "number") g.expenseLast = 0;
+  if (typeof g.lastFansDelta !== "number") g.lastFansDelta = 0;
+  if (!g.outcomeTitle) g.outcomeTitle = "";
+  if (!g.outcomeText) g.outcomeText = "";
+  return g;
+}
+
 export function loadSeason(): GameState | null {
   try {
-    const raw = localStorage.getItem(SAVE_KEY);
-    if (!raw) return null;
-    const g = JSON.parse(raw) as GameState;
-    pid = g.players.reduce((m, p) => Math.max(m, p.id), 0) + 1;
-    return g;
+    for (const key of [SAVE_KEY, ...LEGACY_KEYS]) {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      const g = migrate(raw);
+      if (g) {
+        pid = g.players.reduce((m, p) => Math.max(m, p.id), 0) + 1;
+        // normalizamos al formato nuevo para la próxima
+        if (key !== SAVE_KEY) { try { localStorage.setItem(SAVE_KEY, JSON.stringify(g)); } catch { /* noop */ } }
+        return g;
+      }
+    }
+    return null;
   } catch { return null; }
 }
+
 export function hasSavedSeason(): boolean {
-  try { return !!localStorage.getItem(SAVE_KEY); } catch { return false; }
+  try { return [SAVE_KEY, ...LEGACY_KEYS].some((k) => !!localStorage.getItem(k)); } catch { return false; }
 }
+
 export function clearSeason() {
-  try { localStorage.removeItem(SAVE_KEY); } catch { /* noop */ }
+  try { [SAVE_KEY, ...LEGACY_KEYS].forEach((k) => localStorage.removeItem(k)); } catch { /* noop */ }
 }
 
 /* ================= NOTICIAS ================= */
