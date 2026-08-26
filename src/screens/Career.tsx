@@ -48,6 +48,7 @@ export function Hub({ g, refresh, onPlayLive, onCupRound, onHelp, muted, onMute 
         <div className="max-w-7xl mx-auto px-4 py-2.5 flex items-center gap-3 flex-wrap">
           <div className="font-display text-2xl tracking-wide">ÑAMBI<span className="text-gold">·</span><span className="text-lima">SPORT</span></div>
           <span className="chip bg-night-800 border border-chalk/15 text-chalk/80 text-sm">{g.mode === "dt" ? "DT" : g.mode === "player" ? "JUGADOR" : "PRESIDENTE"}</span>
+          <span className="chip bg-night-800 border border-cielo/40 text-cielo text-sm font-bold">TEMPORADA {g.season}</span>
           <div className="flex items-center gap-2">
             <Crest club={club} size={30} />
             <span className="font-display text-xl tracking-wide">{club.name}</span>
@@ -808,11 +809,14 @@ export function PostMatch({ g, onNext }: { g: GameState; onNext: () => void }) {
 }
 
 /* ---------------- FINAL DE TEMPORADA ---------------- */
-export function EndScreen({ g, onRestart }: { g: GameState; onRestart: () => void }) {
+export function EndScreen({ g, onRestart, onNextSeason }: { g: GameState; onRestart: () => void; onNextSeason: () => void }) {
   const win = g.outcome === "win";
   const table = sortedTable(g).slice(0, 8);
   const me = g.players.find((p) => p.id === g.userPlayerId);
   const ballonUser = me && g.awards.ballon === me.name;
+  const titles = g.career.filter((c) => c.pos === 1).length;
+  const cups = g.career.filter((c) => c.cupWon).length;
+  const ballons = g.career.filter((c) => c.ballon).length;
   return (
     <div className="min-h-screen grain flex items-center justify-center px-4 py-10 relative overflow-hidden">
       {win && Array.from({ length: 26 }).map((_, i) => (
@@ -871,7 +875,40 @@ export function EndScreen({ g, onRestart }: { g: GameState; onRestart: () => voi
           })}
         </div>
 
-        <button className="btn btn-lima px-12 py-4 text-2xl" onClick={onRestart}><span>NUEVA TEMPORADA</span></button>
+        {/* palmarés de la carrera */}
+        <div className="grid grid-cols-3 gap-2 mb-5">
+          {[[`${titles}`, "LIGAS", "#ffc233"], [`${cups}`, "COPAS", "#41d6ff"], [`${ballons}`, "BALONES", "#b8ff2e"]].map(([v, l, c]) => (
+            <div key={l} className="panel-soft py-2.5">
+              <div className="font-display text-3xl" style={{ color: c }}>{v}</div>
+              <div className="text-[10px] uppercase tracking-widest text-chalk/50">{l}</div>
+            </div>
+          ))}
+        </div>
+        {g.career.length > 1 && (
+          <div className="panel-soft p-3 mb-6 text-left max-h-36 overflow-y-auto">
+            <div className="font-display text-sm tracking-widest text-gold mb-1.5">TU HISTORIA ({g.career.length} TEMPORADAS)</div>
+            {[...g.career].reverse().map((c, i) => (
+              <div key={i} className="flex items-center gap-2 text-xs py-0.5">
+                <span className="font-display text-chalk/40 w-10">{c.season}</span>
+                <Crest club={getClub(g, c.club)} size={14} />
+                <span className="flex-1 truncate">{getClub(g, c.club).name}</span>
+                <span className="font-display text-chalk/70">{c.pos}º</span>
+                {c.cupWon && <span title="Campeón de copa">🏆</span>}
+                {c.pos === 1 && <span title="Campeón de liga" className="text-gold">⭐</span>}
+                {c.ballon && <span title="Balón de Oro">🥇</span>}
+                <span className={`w-2 h-2 rounded-full ${c.outcome === "win" ? "bg-lima" : "bg-hot"}`} />
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          <button className="btn btn-lima px-10 py-4 text-2xl animate-pulsering" onClick={onNextSeason}>
+            <span>TEMPORADA {g.season + 1}</span><ArrowRight size={22} />
+          </button>
+          <button className="btn btn-ghost px-8 py-4 text-lg" onClick={onRestart}><span>REINICIAR CARRERA</span></button>
+        </div>
+        <p className="text-xs text-chalk/40 mt-3">Los jugadores envejecen, los veteranos se retiran y los contratos vencen. Tu leyenda continúa.</p>
       </div>
     </div>
   );

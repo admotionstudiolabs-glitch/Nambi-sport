@@ -92,6 +92,7 @@ export function buildSeason(mode: Mode, leagueId: string, clubId: number, name: 
     seasonDone: false, outcome: null, outcomeTitle: "", outcomeText: "",
     awards: { ballon: null, club: null, goleador: null, clubG: null },
     history: [], eventLog: [], market: buildMarket(), scoutUsed: false, youthPromoted: false, trainCount: 0,
+    season: 2026, career: [],
   };
 }
 
@@ -439,6 +440,13 @@ function finishAll(g: GameState) {
   const cupWon = g.cup?.champion === g.userClub;
   const cupOut = g.cup && g.cup.champion !== null && g.cup.champion !== g.userClub && userInCup(g);
 
+  // guardo esta temporada en la carrera (el outcome lo completa end())
+  const me = g.players.find((p) => p.id === g.userPlayerId);
+  g.career.push({
+    season: g.season, club: g.userClub, pos, cupWon,
+    outcome: "win", ballon: g.awards.ballon === me?.name,
+  });
+
   if (g.mode === "dt") {
     if (g.dt.patience <= 0) end(g, "lose", "TE ECHARON", "La paciencia del presidente se agotó. Te dejan la caja de cartón y el buzo.");
     else if (cupWon) end(g, "win", `¡CAMPEÓN DE ${g.cup!.name.toUpperCase()}!`, "Gloria continental: tu nombre queda grabado en la historia del club.");
@@ -464,6 +472,8 @@ function finishAll(g: GameState) {
 
 function end(g: GameState, outcome: "win" | "lose", title: string, text: string) {
   g.outcome = outcome; g.outcomeTitle = title; g.outcomeText = text;
+  const last = g.career[g.career.length - 1];
+  if (last && last.season === g.season) last.outcome = outcome;
 }
 
 /* ================= CAMBIO DE ROL ================= */
@@ -656,6 +666,102 @@ export function recordMatch(g: GameState, rec: MatchRecord) {
 
 export const coachCandidates = () => COACHES;
 
+/* ================= NUEVA TEMPORADA (carrera continua) ================= */
+export function startNextSeason(g: GameState) {
+  g.season++;
+  const n = g.clubs.length;
+  const rndName = () => `${FIRST_NAMES[Math.floor(Math.random() * FIRST_NAMES.length)]} ${LAST_NAMES[Math.floor(Math.random() * LAST_NAMES.length)]}`;
+
+  /* --- envejecimiento, desarrollo, retiro y contratos --- */
+  const keep: PlayerP[] = [];
+  for (const p of g.players) {
+    p.age++;
+    if (p.stats) {
+      const ks = Object.keys(p.stats) as (keyof PlayerStats)[];
+      if (p.age <= 23) {
+        const ups = 1 + Math.floor(Math.random() * 2);
+        for (let i = 0; i < ups; i++) {
+          const k = ks[Math.floor(Math.random() * ks.length)];
+          p.stats[k] = Math.min(94, p.stats[k] + 1);
+        }
+      } else if (p.age >= 31) {
+        const dec = p.age >= 34 ? 2 : 1;
+        const downs = 1 + Math.floor(Math.random() * 2);
+        for (let i = 0; i < downs; i++) {
+          const k = ks[Math.floor(Math.random() * ks.length)];
+          p.stats[k] = Math.max(45, p.stats[k] - dec);
+        }
+      }
+      p.med = medFromStats(p.stats, p.pos);
+      p.baseMed = p.med;
+    }
+    p.value = valueOf(p.med);
+
+    // el usuario nunca se retira ni se va por su cuenta
+    if (p.isUser) {
+      p.contract = Math.max(p.contract - 1, 1);
+      keep.push(p);
+      continue;
+    }
+    // retiro de veteranos
+    if (p.age >= 35 && Math.random() < (p.age - 33) * 0.22) {
+      g.eventLog.unshift({ round: 0, kind: "info", text: `${p.name} anunció su retiro a los ${p.age} años.` });
+      continue;
+    }
+    // contratos: los buenos del club del usuario se van libres; el resto renueva
+    p.contract--;
+    if (p.contract <= 0) {
+      if (p.clubId === g.userClub && p.med >= 70) {
+        g.eventLog.unshift({ round: 0, kind: "bad", text: `${p.name} terminó contrato y se fue libre.` });
+        continue;
+      }
+      p.contract = 1 + Math.floor(Math.random() * 3);
+    }
+    keep.push(p);
+  }
+  g.players = keep;
+
+  /* --- relleno: ningún club con menos de 14 (suben juveniles) --- */
+  g.clubs.forEach((c) => {
+    const size = g.players.filter((p) => p.clubId === c.id).length;
+    let need = 14 - size;
+    while (need-- > 0) {
+      const pos = (["DEF", "MED", "DEL"] as Pos[])[Math.floor(Math.random() * 3)];
+      const med = 60 + Math.floor(Math.random() * 12);
+      g.players.push({
+        id: pid++, name: rndName(), pos, med, age: 17 + Math.floor(Math.random() * 4),
+        value: valueOf(med), energy: 100, clubId: c.id, goals: 0, matches: 0, ratings: [],
+        stats: statsFor(med, pos), num: 30 + size + need, nat: "—", wage: wageOf(med),
+        contract: 2, injured: 0, form: 70, baseMed: med,
+      });
+    }
+  });
+
+  /* --- reset de la competición --- */
+  g.fixtures = roundRobin(n);
+  const standings: Record<number, Standing> = {};
+  g.clubs.forEach((c) => { standings[c.id] = { pts: 0, pj: 0, gf: 0, gc: 0 }; });
+  g.standings = standings;
+  g.round = 0; g.phase = "league"; g.cup = null; g.userXI = null;
+  g.seasonDone = false; g.outcome = null; g.outcomeTitle = ""; g.outcomeText = "";
+  g.awards = { ballon: null, club: null, goleador: null, clubG: null };
+  g.lastResult = null; g.topScorers = [];
+
+  /* --- reset del estado de los jugadores --- */
+  g.players.forEach((p) => { p.goals = 0; p.matches = 0; p.ratings = []; p.energy = 100; p.injured = 0; p.form = 70; });
+
+  /* --- reset de la temporada --- */
+  g.market = buildMarket();
+  g.scoutUsed = false; g.youthPromoted = false; g.trainCount = 0;
+
+  if (g.mode === "dt") {
+    g.dt.patience = 70; g.dt.trained = false; g.dt.boostPos = null; g.dt.boostAmt = 0;
+    g.dt.expectPos = Math.max(1, Math.round(n * 0.35) - g.clubs[g.userClub].prestige + 1);
+  }
+
+  g.eventLog.unshift({ round: 0, kind: "good", text: `🏁 Arranca la temporada ${g.season}. ¡A dejar todo!` });
+}
+
 /* ================= GUARDADO (a prueba de versiones) ================= */
 const SAVE_KEY = "nambi_sport_save_v3";
 const LEGACY_KEYS = ["nambi_sport_save_v2", "nambi_sport_save_v1", "nambi_sport_save"];
@@ -697,6 +803,24 @@ function migrate(raw: string): GameState | null {
   if (typeof g.lastFansDelta !== "number") g.lastFansDelta = 0;
   if (!g.outcomeTitle) g.outcomeTitle = "";
   if (!g.outcomeText) g.outcomeText = "";
+  if (typeof g.season !== "number") g.season = 2026;
+  if (!Array.isArray(g.career)) g.career = [];
+  if (!Array.isArray(g.history)) g.history = [];
+  if (!Array.isArray(g.eventLog)) g.eventLog = [];
+  if (!Array.isArray(g.market)) g.market = buildMarket();
+  if (typeof g.scoutUsed !== "boolean") g.scoutUsed = false;
+  if (typeof g.youthPromoted !== "boolean") g.youthPromoted = false;
+  if (typeof g.trainCount !== "number") g.trainCount = 0;
+  // campos nuevos por jugador
+  g.players.forEach((p) => {
+    if (typeof p.num !== "number") p.num = 0;
+    if (!p.nat) p.nat = "—";
+    if (typeof p.wage !== "number") p.wage = wageOf(p.med);
+    if (typeof p.contract !== "number") p.contract = 2;
+    if (typeof p.injured !== "number") p.injured = 0;
+    if (typeof p.form !== "number") p.form = 70;
+    if (typeof p.baseMed !== "number") p.baseMed = p.med;
+  });
   return g;
 }
 

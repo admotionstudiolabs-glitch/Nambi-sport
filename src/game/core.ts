@@ -74,6 +74,8 @@ export interface GameState {
   scoutUsed: boolean;
   youthPromoted: boolean;
   trainCount: number;
+  season: number;
+  career: CareerSeason[];
 }
 
 /* ================= PARTIDOS / EVENTOS / MERCADO ================= */
@@ -85,6 +87,12 @@ export interface GameEvent { round: number; text: string; kind: "good" | "bad" |
 export interface MarketPlayer {
   name: string; pos: Pos; med: number; age: number; num: number; nat: string;
   price: number; hidden: boolean;
+}
+
+/* una temporada dentro de tu carrera */
+export interface CareerSeason {
+  season: number; club: number; pos: number; cupWon: boolean; outcome: "win" | "lose";
+  ballon: boolean; relegated?: boolean;
 }
 
 /* ================= LIGAS ================= */

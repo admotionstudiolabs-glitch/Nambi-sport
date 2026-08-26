@@ -4,7 +4,7 @@ import type { GameState, Mode, PlayerP, Pos, Screen } from "./game/core";
 import { LEAGUES } from "./game/core";
 import {
   buildSeason, clearSeason, closeRound, getClub, hasSavedSeason, loadSeason, playCupRound,
-  saveSeason, simOthers, squadOf, teamStrength, userNextFixture, xiOf,
+  saveSeason, simOthers, squadOf, startNextSeason, teamStrength, userNextFixture, xiOf,
 } from "./game/engine";
 import { sfx } from "./game/audio";
 import SimMatch from "./components/SimMatch";
@@ -270,7 +270,18 @@ export default function App() {
   if (screen === "end") {
     return (
       <Guard onReset={() => { clearSeason(); setHasSave(false); gameRef.current = null; setScreen("menu"); }}>
-        <EndScreen g={g} onRestart={() => { clearSeason(); setHasSave(false); gameRef.current = null; setScreen("menu"); }} />
+        <EndScreen
+          g={g}
+          onRestart={() => { clearSeason(); setHasSave(false); gameRef.current = null; setScreen("menu"); }}
+          onNextSeason={() => {
+            startNextSeason(g);
+            refresh();
+            persist(true);
+            setMatchKey((k) => k + 1);
+            setScreen("hub");
+            sfx.whistle();
+          }}
+        />
       </Guard>
     );
   }
