@@ -708,7 +708,7 @@ export default function SimMatch(props: Props) {
 
     /* ============ DIBUJO ============ */
     const cam = { x: FW / 2, y: FH / 2, z: 1 };
-    const draw = () => {
+    const draw = (now: number) => {
       const s = st.current; const pr = propsRef.current;
       // cámara
       const nearGoal = 1 - clamp(Math.min(s.ball.x, FW - s.ball.x) / (FW * 0.3), 0, 1);
@@ -926,7 +926,7 @@ export default function SimMatch(props: Props) {
           }
         }
       }
-      draw();
+      draw(now);
       setUi((u) =>
         u.min !== Math.floor(s.min) || u.scoreH !== s.scoreH || u.scoreA !== s.scoreA || u.speed !== speedRef.current
           ? { min: Math.floor(s.min), scoreH: s.scoreH, scoreA: s.scoreA, momentum: s.momentum, speed: speedRef.current }
