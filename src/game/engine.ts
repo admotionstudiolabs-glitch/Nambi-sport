@@ -36,14 +36,11 @@ function buildMarket(): MarketPlayer[] {
 let pid = 1;
 
 /* ================= CONSTRUCCIÓN ================= */
-export function buildSeason(mode: Mode, leagueId: string, clubId: number, name: string, pos: Pos): GameState {
-  pid = 1;
+/* Arma todos los planteles desde los datos reales de la liga. Reutilizable para
+   crear una temporada nueva Y para reparar partidas guardadas viejas. */
+function buildRoster(leagueId: string, mode: Mode, clubId: number, name: string, pos: Pos): { players: PlayerP[]; userPlayerId: number } {
   const league = leagueOf(leagueId);
   const players: PlayerP[] = [];
-  const clubs: Club[] = league.rows.map((r, i) => ({
-    id: i, name: r[0], short: r[1], c1: r[2], c2: r[3], stripe: r[4],
-    prestige: r[5], capacity: r[6], money: r[7], fans: r[8],
-  }));
   for (let ci = 0; ci < league.rows.length; ci++) {
     let autoNum = 0;
     for (const row of league.rows[ci][9]) {
@@ -71,6 +68,17 @@ export function buildSeason(mode: Mode, leagueId: string, clubId: number, name: 
     players.push(me);
     userPlayerId = me.id;
   }
+  return { players, userPlayerId };
+}
+
+export function buildSeason(mode: Mode, leagueId: string, clubId: number, name: string, pos: Pos): GameState {
+  pid = 1;
+  const league = leagueOf(leagueId);
+  const { players, userPlayerId } = buildRoster(leagueId, mode, clubId, name, pos);
+  const clubs: Club[] = league.rows.map((r, i) => ({
+    id: i, name: r[0], short: r[1], c1: r[2], c2: r[3], stripe: r[4],
+    prestige: r[5], capacity: r[6], money: r[7], fans: r[8],
+  }));
   const fixtures = roundRobin(clubs.length);
   const standings: Record<number, Standing> = {};
   clubs.forEach((c) => { standings[c.id] = { pts: 0, pj: 0, gf: 0, gc: 0 }; });
@@ -763,8 +771,8 @@ export function startNextSeason(g: GameState) {
 }
 
 /* ================= GUARDADO (a prueba de versiones) ================= */
-const SAVE_KEY = "nambi_sport_save_v3";
-const LEGACY_KEYS = ["nambi_sport_save_v2", "nambi_sport_save_v1", "nambi_sport_save"];
+const SAVE_KEY = "nambi_sport_save_v4";
+const LEGACY_KEYS = ["nambi_sport_save_v3", "nambi_sport_save_v2", "nambi_sport_save_v1", "nambi_sport_save"];
 
 export function saveSeason(g: GameState): boolean {
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(g)); return true; } catch { return false; }
@@ -811,6 +819,33 @@ function migrate(raw: string): GameState | null {
   if (typeof g.scoutUsed !== "boolean") g.scoutUsed = false;
   if (typeof g.youthPromoted !== "boolean") g.youthPromoted = false;
   if (typeof g.trainCount !== "number") g.trainCount = 0;
+
+  /* REPARACIÓN DE PLANTELES: si la partida es anterior a los planteles reales
+     (escuadras chicas o jugadores sin formato nuevo), reconstruimos TODOS los
+     planteles desde los datos actuales, conservando la carrera del usuario. */
+  const squadSizes = g.clubs.map((c) => g.players.filter((p) => p.clubId === c.id).length);
+  const tooSmall = squadSizes.some((n) => n < 14);
+  const staleFormat = g.players.length > 0 && g.players.some((p) => typeof (p as { baseMed?: number }).baseMed !== "number");
+  if (tooSmall || staleFormat) {
+    const oldUser = g.players.find((p) => p.isUser);
+    const savedMoney = g.clubs.map((c) => c.money);
+    const savedFans = g.clubs.map((c) => c.fans);
+    const fresh = buildRoster(g.leagueId, g.mode, g.userClub, g.userName || "Tu Pibe", g.userPos || "DEL");
+    g.players = fresh.players;
+    g.userPlayerId = fresh.userPlayerId;
+    g.userXI = null;
+    g.topScorers = [];
+    g.clubs.forEach((c, i) => { c.money = savedMoney[i] ?? c.money; c.fans = savedFans[i] ?? c.fans; });
+    if (oldUser && g.mode === "player") {
+      const me = g.players.find((p) => p.isUser);
+      if (me && oldUser.stats) {
+        me.stats = oldUser.stats; me.med = oldUser.med; me.goals = oldUser.goals;
+        me.ratings = oldUser.ratings; me.age = oldUser.age; me.value = oldUser.value;
+      }
+    }
+    g.eventLog.unshift({ round: 0, kind: "info", text: "📋 Se actualizaron los planteles a las plantillas reales." });
+  }
+
   // campos nuevos por jugador
   g.players.forEach((p) => {
     if (typeof p.num !== "number") p.num = 0;
