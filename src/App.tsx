@@ -8,7 +8,6 @@ import {
 } from "./game/engine";
 import { sfx } from "./game/audio";
 import SimMatch from "./components/SimMatch";
-import ArcadeMatch from "./components/ArcadeMatch";
 import { ClubSelect, HelpOverlay, ModeSelect, PlayerSetup, TitleScreen } from "./screens/Menu";
 import { EndScreen, Hub, PostMatch } from "./screens/Career";
 
@@ -182,6 +181,10 @@ export default function App() {
     const userSide: 0 | 1 = isHome ? 0 : 1;
     const rivalId = isHome ? fx.away : fx.home;
     const userXi = ensureUserXI(g);
+    /* en modo jugador fijamos el once para que tu pibe esté siempre en cancha */
+    if (g.mode === "player" && userXi.some((p) => p.isUser)) {
+      g.userXI = userXi.map((p) => p.id);
+    }
     const home = getClub(g, fx.home), away = getClub(g, fx.away);
     const userClub = getClub(g, g.userClub);
     const rivalClub = getClub(g, rivalId);
@@ -202,49 +205,37 @@ export default function App() {
       <Guard onReset={() => { gameRef.current = loadSeason(); setScreen(gameRef.current ? "hub" : "menu"); }}>
         <div className="min-h-screen grain px-3 md:px-6 py-5">
           <div className="max-w-6xl mx-auto">
-            {g.mode === "player" && me ? (
-              <ArcadeMatch
-                key={`arc-${matchKey}`}
-                user={me}
-                home={home}
-                away={away}
-                userXi={userXi}
-                rivalXi={rivalXi}
-                role={g.userRole}
-                onFinish={finish}
-              />
-            ) : (
-              <SimMatch
-                key={`sim-${matchKey}`}
-                home={home}
-                away={away}
-                userSide={userSide}
-                getHomeXi={() => xiOf(g, fx.home, g.dt.formation)}
-                getAwayXi={() => xiOf(g, fx.away, "4-3-3")}
-                getUserXi={() => xiOf(g, g.userClub, g.dt.formation)}
-                getSquad={() => squadOf(g, g.userClub)}
-                getStrengths={() => ({
-                  h: teamStrength(g, fx.home, xiOf(g, fx.home, g.dt.formation)),
-                  a: teamStrength(g, fx.away, xiOf(g, fx.away, "4-3-3")),
-                })}
-                interactive={g.mode === "dt"}
-                mentality={g.dt.mentality}
-                pressing={g.dt.pressing}
-                onTactics={(patch) => {
-                  if (patch.mentality !== undefined) g.dt.mentality = patch.mentality;
-                  if (patch.pressing !== undefined) g.dt.pressing = patch.pressing;
+            <SimMatch
+              key={`sim-${matchKey}`}
+              home={home}
+              away={away}
+              userSide={userSide}
+              getHomeXi={() => xiOf(g, fx.home, g.dt.formation)}
+              getAwayXi={() => xiOf(g, fx.away, "4-3-3")}
+              getUserXi={() => xiOf(g, g.userClub, g.dt.formation)}
+              getSquad={() => squadOf(g, g.userClub)}
+              getStrengths={() => ({
+                h: teamStrength(g, fx.home, xiOf(g, fx.home, g.dt.formation)),
+                a: teamStrength(g, fx.away, xiOf(g, fx.away, "4-3-3")),
+              })}
+              interactive={g.mode === "dt"}
+              mentality={g.dt.mentality}
+              pressing={g.dt.pressing}
+              controlledId={g.mode === "player" && me ? me.id : undefined}
+              onTactics={(patch) => {
+                if (patch.mentality !== undefined) g.dt.mentality = patch.mentality;
+                if (patch.pressing !== undefined) g.dt.pressing = patch.pressing;
+                setTick((t) => t + 1);
+              }}
+              onSub={(outId, inId) => {
+                const ids = xiOf(g, g.userClub, g.dt.formation).map((p) => (p.id === outId ? inId : p.id));
+                if (new Set(ids).size === 11) {
+                  g.userXI = ids;
                   setTick((t) => t + 1);
-                }}
-                onSub={(outId, inId) => {
-                  const ids = xiOf(g, g.userClub, g.dt.formation).map((p) => (p.id === outId ? inId : p.id));
-                  if (new Set(ids).size === 11) {
-                    g.userXI = ids;
-                    setTick((t) => t + 1);
-                  }
-                }}
-                onFinish={finish}
-              />
-            )}
+                }
+              }}
+              onFinish={finish}
+            />
             <div className="mt-4 flex items-center justify-between">
               <span className="chip bg-night-800 border border-chalk/15 text-chalk/70 text-sm">
                 {userClub.name} vs {rivalClub.name} · Fecha {g.round + 1}

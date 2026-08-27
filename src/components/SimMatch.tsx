@@ -23,6 +23,8 @@ interface Props {
   onTactics: (patch: { mentality?: number; pressing?: number }) => void;
   onSub: (outId: number, inId: number) => void;
   onFinish: (res: MatchResult) => void;
+  /* modo jugador: id del jugador que controlás. undefined = simulación pura (DT/Presidente) */
+  controlledId?: number;
 }
 
 interface Ent {
@@ -46,6 +48,9 @@ interface SimState {
   shake: number; flash: number; banner: { text: string; t: number } | null;
   momentum: number; done: boolean; htShown: boolean; pauseK: number; kickTeam: 0 | 1;
   decT: number; looseT: number; graceT: number;
+  /* seguimiento del jugador controlado (modo jugador) */
+  stamina: number; userGoals: number; userAssists: number; userTackles: number; userShots: number;
+  askCd: number; clearCd: number; kickCd: number; lastPasser: number;
 }
 
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
@@ -56,6 +61,13 @@ const lum = (hex: string) => {
   const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
   return (0.299 * r + 0.587 * g + 0.114 * b) / 255;
 };
+
+const Key = ({ children }: { children: React.ReactNode }) => (
+  <kbd className="px-1.5 py-0.5 font-display text-[11px] tracking-wider text-lima"
+    style={{ background: "rgba(184,255,46,0.12)", border: "1px solid rgba(184,255,46,0.4)", borderBottomWidth: 2 }}>
+    {children}
+  </kbd>
+);
 
 export default function SimMatch(props: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -71,34 +83,58 @@ export default function SimMatch(props: Props) {
     shake: 0, flash: 0, banner: { text: "¡COMIENZA!", t: 1.4 },
     momentum: 0, done: false, htShown: false, pauseK: 0.5, kickTeam: 0,
     decT: 0.4, looseT: 0, graceT: 0,
+    stamina: 100, userGoals: 0, userAssists: 0, userTackles: 0, userShots: 0,
+    askCd: 0, clearCd: 0, kickCd: 0, lastPasser: -1,
   });
   const pausedRef = useRef(false);
   const autoPausedRef = useRef(false);
   const speedRef = useRef(1);
   const propsRef = useRef(props);
   propsRef.current = props;
+  const keys = useRef<Record<string, boolean>>({});
+  const act = useRef({ shoot: false, pass: false, ask: false, clear: false, sprint: false });
 
-  const [ui, setUi] = useState({ min: 0, scoreH: 0, scoreA: 0, momentum: 0, speed: 1 });
+  const [ui, setUi] = useState({ min: 0, scoreH: 0, scoreA: 0, momentum: 0, speed: 1, stamina: 100, uG: 0, uA: 0, uT: 0 });
   const [paused, setPaused] = useState(false);
   const [subOpen, setSubOpen] = useState(false);
   const [subOut, setSubOut] = useState(-1);
   const [subIn, setSubIn] = useState(-1);
   const [, force] = useState(0);
+  const controlled = props.controlledId !== undefined;
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" || e.key === "p" || e.key === "P") {
+      const k = e.key.toLowerCase();
+      if (k === "escape" || k === "p") {
         pausedRef.current = !pausedRef.current;
         setPaused(pausedRef.current);
         sfx.click();
+        return;
       }
-      if (e.key === "1") speedRef.current = 1;
-      if (e.key === "2") speedRef.current = 2;
-      if (e.key === "4") speedRef.current = 4;
+      if (k === "1") speedRef.current = 1;
+      if (k === "2") speedRef.current = 2;
+      if (k === "4") speedRef.current = 4;
+      if (props.controlledId !== undefined) {
+        keys.current[k] = true;
+        if (k === "shift") act.current.sprint = true;
+        if (k === " ") { act.current.shoot = true; e.preventDefault(); }
+        if (k === "e") act.current.pass = true;
+        if (k === "q") act.current.ask = true;
+        if (k === "f") act.current.clear = true;
+      }
+    };
+    const onUp = (e: KeyboardEvent) => {
+      const k = e.key.toLowerCase();
+      keys.current[k] = false;
+      if (k === "shift") act.current.sprint = false;
     };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
+    window.addEventListener("keyup", onUp);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("keyup", onUp);
+    };
+  }, [props.controlledId]);
 
   useEffect(() => {
     const cv = canvasRef.current;
@@ -108,6 +144,9 @@ export default function SimMatch(props: Props) {
 
     const pr0 = propsRef.current;
     const us = pr0.userSide;
+    const ctrlId = pr0.controlledId;
+    const isCtrl = (e: Ent) => ctrlId !== undefined && e.p.id === ctrlId;
+    const ctrlIdx = () => st.current.ents.findIndex((e) => ctrlId !== undefined && e.p.id === ctrlId);
 
     /* ============ TRIBUNA PRE-RENDERIZADA ============ */
     const standCv = document.createElement("canvas");
@@ -229,6 +268,13 @@ export default function SimMatch(props: Props) {
       const s = st.current; const pr = propsRef.current;
       if (team === 0) s.scoreH++; else s.scoreA++;
       const sp = s.ents[shooterIdx]?.p;
+      /* conteo del jugador controlado */
+      if (ctrlId !== undefined && sp && sp.id === ctrlId) s.userGoals++;
+      else if (ctrlId !== undefined && s.lastPasser >= 0) {
+        const passer = s.ents[s.lastPasser];
+        if (passer && passer.p.id === ctrlId) s.userAssists++;
+      }
+      s.lastPasser = -1;
       const clubId = team === 0 ? pr.home.id : pr.away.id;
       if (sp) s.scorers.push({ pid: sp.id, name: sp.name, club: clubId, min: Math.floor(s.min) });
       s.events.unshift({ min: Math.floor(s.min), club: clubId, kind: "goal", text: `¡GOOOOL DE ${lastName(sp?.name ?? "LA CASA")}! Grita ${team === 0 ? pr.home.name : pr.away.name}.` });
@@ -359,6 +405,67 @@ export default function SimMatch(props: Props) {
       force((t) => t + 1);
     };
 
+    /* ---- acciones del jugador controlado ---- */
+    const userPass = (oi: number) => {
+      const s = st.current; const o = s.ents[oi];
+      const dir = o.team === 0 ? 1 : -1;
+      const mates = s.ents.map((e, i) => ({ e, i }))
+        .filter((z) => z.e.team === o.team && z.i !== oi && !z.e.sent && z.e.role !== "ARQ");
+      if (!mates.length) return;
+      // el más adelantado y libre
+      const scored = mates.map((z) => ({ z, score: z.e.x * dir * 0.6 + nearestOppDist(z.e) * 1.1 - dist(o, z.e) * 0.3 }));
+      scored.sort((a, b) => b.score - a.score);
+      const t = scored[0].z.e;
+      const dx = t.x + dir * 34 - s.ball.x, dy = t.y - s.ball.y;
+      const dl = Math.hypot(dx, dy) || 1;
+      const pw = clamp(dl * 2.4, 380, 640);
+      s.ball.vx = (dx / dl) * pw; s.ball.vy = (dy / dl) * pw;
+      s.ball.owner = -1; s.passTarget = scored[0].z.i; s.passFrom = oi;
+      s.shotTeam = -1; s.crossBall = false;
+      s.lastPasser = oi; // para contar asistencia
+      s.stats[o.team === 0 ? "passesH" : "passesA"]++;
+      s.kickCd = 0.3;
+      sfx.pass();
+    };
+
+    const userClear = (oi: number) => {
+      const s = st.current; const o = s.ents[oi];
+      const dir = o.team === 0 ? 1 : -1;
+      s.ball.vx = dir * (660 + Math.random() * 80);
+      s.ball.vy = (Math.random() - 0.5) * 240;
+      s.ball.owner = -1; s.passTarget = -1; s.passFrom = oi; s.shotTeam = -1;
+      s.kickCd = 0.4;
+      popup(o.x, o.y - 24, "¡DESPEJE!", "#41d6ff");
+      sfx.kick();
+    };
+
+    const userShoot = (oi: number) => {
+      const s = st.current;
+      s.userShots++;
+      s.kickCd = 0.35;
+      doShot(oi);
+    };
+
+    /* un compañero le da la pelota al controlado (pedirla con Q) */
+    const passToUser = () => {
+      const s = st.current;
+      const ui = ctrlIdx();
+      if (ui < 0 || s.ball.owner < 0) return;
+      const owner = s.ents[s.ball.owner];
+      const me = s.ents[ui];
+      if (owner.team !== me.team || s.ball.owner === ui) return;
+      const dx = me.x - s.ball.x, dy = me.y - s.ball.y;
+      const dl = Math.hypot(dx, dy) || 1;
+      const pw = clamp(dl * 2.4, 380, 620);
+      s.ball.vx = (dx / dl) * pw; s.ball.vy = (dy / dl) * pw;
+      s.ball.owner = -1; s.passTarget = ui; s.passFrom = s.ents.indexOf(owner);
+      s.shotTeam = -1; s.crossBall = false;
+      s.lastPasser = -1;
+      s.stats[owner.team === 0 ? "passesH" : "passesA"]++;
+      s.askCd = 1.1;
+      sfx.pass();
+    };
+
     /* ============ FÍSICA ============ */
     const steer = (e: Ent, tx: number, ty: number, maxSp: number, h: number) => {
       const dx = tx - e.x, dy = ty - e.y;
@@ -453,6 +560,33 @@ export default function SimMatch(props: Props) {
         const dir = e.team === 0 ? 1 : -1;
         let tx: number, ty: number, sp: number;
 
+        /* ---- jugador controlado por el usuario ---- */
+        if (isCtrl(e)) {
+          s.kickCd = Math.max(0, s.kickCd - h);
+          s.askCd = Math.max(0, s.askCd - h);
+          s.clearCd = Math.max(0, s.clearCd - h);
+          let mx = 0, my = 0;
+          if (keys.current["w"] || keys.current["arrowup"]) my -= 1;
+          if (keys.current["s"] || keys.current["arrowdown"]) my += 1;
+          if (keys.current["a"] || keys.current["arrowleft"]) mx -= 1;
+          if (keys.current["d"] || keys.current["arrowright"]) mx += 1;
+          const sprinting = act.current.sprint && s.stamina > 2 && (mx !== 0 || my !== 0);
+          if (sprinting) s.stamina = Math.max(0, s.stamina - 24 * h);
+          else s.stamina = Math.min(100, s.stamina + 11 * h);
+          const base = (b.owner === i ? 116 : 106) * spd;
+          const maxSp = base * (sprinting ? 1.45 : 1);
+          if (mx !== 0 || my !== 0) {
+            const l = Math.hypot(mx, my);
+            steer(e, e.x + (mx / l) * 70, e.y + (my / l) * 70, maxSp, h);
+          } else {
+            e.vx *= 1 - (1 - Math.exp(-6 * h)); e.vy *= 1 - (1 - Math.exp(-6 * h));
+            e.x += e.vx * h; e.y += e.vy * h;
+          }
+          e.x = clamp(e.x, -6, FW + 6);
+          e.y = clamp(e.y, -6, FH + 6);
+          return; // la IA no maneja a este jugador
+        }
+
         if (e.role === "ARQ") {
           const gx = e.team === 0 ? 42 : FW - 42;
           tx = gx;
@@ -505,6 +639,52 @@ export default function SimMatch(props: Props) {
         e.y = clamp(e.y, -6, FH + 6);
       });
 
+      /* ---- acciones del jugador controlado (sin pelota o con pelota) ---- */
+      if (ctrlId !== undefined) {
+        const ui = ctrlIdx();
+        if (ui >= 0) {
+          const me = s.ents[ui];
+          const iOwn = b.owner === ui;
+          if (iOwn && s.kickCd <= 0 && !me.sent) {
+            if (act.current.shoot) {
+              act.current.shoot = false;
+              const gx = me.team === 0 ? FW - 24 : 24;
+              const dGoal = Math.hypot(gx - me.x, FH / 2 - me.y);
+              if (dGoal < 270) userShoot(ui);
+              else userPass(ui);
+            } else if (act.current.pass) {
+              act.current.pass = false;
+              userPass(ui);
+            } else if (act.current.clear) {
+              act.current.clear = false;
+              userClear(ui);
+            }
+          } else if (!iOwn && b.owner >= 0 && s.ents[b.owner].team === me.team && s.askCd <= 0 && act.current.ask) {
+            act.current.ask = false;
+            passToUser();
+          } else {
+            act.current.shoot = false; act.current.pass = false; act.current.clear = false; act.current.ask = false;
+          }
+          /* robo del controlado: si un rival tiene la pelota y estás pegado */
+          if (!iOwn && b.owner >= 0 && s.ents[b.owner].team !== me.team && s.graceT <= 0 && me.cd <= 0) {
+            const rival = s.ents[b.owner];
+            if (dist(me, rival) < 21) {
+              me.cd = 0.9;
+              const reg = rival.p.stats?.regate ?? rival.p.med;
+              const myDef = (me.p.stats?.defensa ?? me.p.med) + (me.role === "DEF" ? 8 : 0);
+              const pWin = clamp(0.34 + (myDef - reg) / 90, 0.16, 0.7);
+              if (Math.random() < pWin) {
+                takeBall(ui);
+                s.userTackles++;
+                sfx.tackle();
+                popup(me.x, me.y - 26, "¡RECUPERASTE!", "#b8ff2e");
+                force((t) => t + 1);
+              }
+            }
+          }
+        }
+      }
+
       /* ---- decisiones del dueño ---- */
       if (b.owner >= 0) {
         const o = s.ents[b.owner];
@@ -513,7 +693,8 @@ export default function SimMatch(props: Props) {
           b.y = o.y + Math.sin(o.face) * 12 + Math.sin(now / 90) * 1.2;
           b.vx = 0; b.vy = 0;
           s.decT -= h;
-          if (s.decT <= 0) {
+          /* la IA no decide por el jugador controlado */
+          if (s.decT <= 0 && !isCtrl(o)) {
             s.decT = 0.15 + Math.random() * 0.16;
             const gx = o.team === 0 ? FW - 24 : 24;
             const dGoal = Math.hypot(gx - o.x, FH / 2 - o.y);
@@ -804,6 +985,18 @@ export default function SimMatch(props: Props) {
           ctx.beginPath(); ctx.arc(e.x, e.y + bob, 14.5, 0, Math.PI * 2);
           ctx.strokeStyle = "#b8ff2e"; ctx.lineWidth = 2.5; ctx.stroke();
         }
+        /* marcador del jugador controlado */
+        if (isCtrl(e)) {
+          const pulse = 15.5 + Math.sin(now / 180) * 1.5;
+          ctx.beginPath(); ctx.arc(e.x, e.y + bob, pulse, 0, Math.PI * 2);
+          ctx.strokeStyle = "#ffc233"; ctx.lineWidth = 2.5; ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(e.x, e.y - pulse - 9);
+          ctx.lineTo(e.x - 5, e.y - pulse - 16);
+          ctx.lineTo(e.x + 5, e.y - pulse - 16);
+          ctx.closePath();
+          ctx.fillStyle = "#ffc233"; ctx.fill();
+        }
         // cuerpo
         ctx.beginPath(); ctx.arc(e.x, e.y + bob, isGk ? 10 : 8.5, 0, Math.PI * 2);
         ctx.fillStyle = c1; ctx.fill();
@@ -914,6 +1107,15 @@ export default function SimMatch(props: Props) {
             finished = true;
             cancelAnimationFrame(raf);
             const tot = s.stats.possH + s.stats.possA || 1;
+            /* puntaje del jugador controlado */
+            let rating: number | undefined;
+            if (ctrlId !== undefined) {
+              rating = clamp(
+                6 + s.userGoals * 1.3 + s.userAssists * 0.8 + s.userTackles * 0.25 + Math.min(s.userShots, 4) * 0.12 - 0.5,
+                4, 10,
+              );
+              rating = Math.round(rating * 10) / 10;
+            }
             pr.onFinish({
               gh: s.scoreH, ga: s.scoreA, events: s.events, scorers: s.scorers, cards: s.cards,
               stats: {
@@ -921,15 +1123,24 @@ export default function SimMatch(props: Props) {
                 shotsH: s.stats.shotsH, shotsA: s.stats.shotsA, onH: s.stats.onH, onA: s.stats.onA,
                 passesH: s.stats.passesH, passesA: s.stats.passesA, foulsH: s.stats.foulsH, foulsA: s.stats.foulsA,
               },
+              userGoals: ctrlId !== undefined ? s.userGoals : undefined,
+              userAssists: ctrlId !== undefined ? s.userAssists : undefined,
+              tackles: ctrlId !== undefined ? s.userTackles : undefined,
+              rating,
             });
             return;
           }
         }
       }
       draw(now);
+      const stam = Math.round(s.stamina);
       setUi((u) =>
         u.min !== Math.floor(s.min) || u.scoreH !== s.scoreH || u.scoreA !== s.scoreA || u.speed !== speedRef.current
-          ? { min: Math.floor(s.min), scoreH: s.scoreH, scoreA: s.scoreA, momentum: s.momentum, speed: speedRef.current }
+          || u.stamina !== stam || u.uG !== s.userGoals || u.uA !== s.userAssists || u.uT !== s.userTackles
+          ? {
+              min: Math.floor(s.min), scoreH: s.scoreH, scoreA: s.scoreA, momentum: s.momentum, speed: speedRef.current,
+              stamina: stam, uG: s.userGoals, uA: s.userAssists, uT: s.userTackles,
+            }
           : u
       );
     };
@@ -972,6 +1183,29 @@ export default function SimMatch(props: Props) {
         </div>
         <div className="scoreled px-4 py-1.5 text-2xl flex items-center text-cielo" style={{ borderLeft: "none" }}>{ui.min}'</div>
       </div>
+
+      {/* HUD del jugador controlado */}
+      {controlled && (
+        <div className="flex items-center gap-4 flex-wrap mb-3 panel-soft px-4 py-2.5">
+          <div className="flex items-center gap-2 flex-1 min-w-[180px]">
+            <span className="font-display tracking-widest text-gold text-sm">AGUANTE</span>
+            <div className="flex-1 h-3" style={{ background: "rgba(3,13,7,0.8)", border: "1px solid rgba(242,255,233,0.18)" }}>
+              <div className="h-full transition-all duration-150" style={{
+                width: `${ui.stamina}%`,
+                background: ui.stamina > 40 ? "linear-gradient(90deg,#0f8a44,#b8ff2e)" : "linear-gradient(90deg,#a32638,#ff4257)",
+              }} />
+            </div>
+          </div>
+          <div className="flex items-center gap-4 font-display text-xl">
+            <span className="text-lima">{ui.uG} <span className="text-[11px] text-chalk/50 tracking-widest">GOLES</span></span>
+            <span className="text-cielo">{ui.uA} <span className="text-[11px] text-chalk/50 tracking-widest">ASIST.</span></span>
+            <span className="text-gold">{ui.uT} <span className="text-[11px] text-chalk/50 tracking-widest">RECUP.</span></span>
+          </div>
+          <div className="hidden md:flex items-center gap-1.5 text-[11px] text-chalk/55">
+            <Key>WASD</Key> moverte <Key>SHIFT</Key> sprint <Key>ESP</Key> tiro/pase <Key>E</Key> pase <Key>Q</Key> pedirla <Key>F</Key> despeje
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-col lg:flex-row gap-4">
         <div className="flex-1 relative">
