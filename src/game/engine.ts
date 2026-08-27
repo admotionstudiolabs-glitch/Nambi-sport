@@ -2,7 +2,7 @@ import type {
   Club, CupState, CupTie, Fm, Fixture, GameState, MatchResult, Mode, PlayerP, PlayerStats, Pos, Role, Standing, Strength,
 } from "./core";
 import { COACHES, clamp, formationLayout, isClasico, leagueOf, medFromStats, statsFor, valueOf, wageOf } from "./core";
-import type { GameEvent, MarketPlayer, MatchRecord } from "./core";
+import type { DecisionEvent, DecisionOption, GameEvent, MarketPlayer, MatchRecord, TransferOffer } from "./core";
 
 const FREE_AGENTS: [string, Pos, number, number, string][] = [
   ["Ángel Di María", "DEL", 86, 37, "🇦🇷"], ["Leandro Paredes", "MED", 85, 31, "🇦🇷"],
@@ -94,13 +94,14 @@ export function buildSeason(mode: Mode, leagueId: string, clubId: number, name: 
       expectPos: Math.max(1, Math.round(clubs.length * 0.35) - prestige + 1),
       boostPos: null, boostAmt: 0, trained: false,
     },
-    pres: { ticket: 3, sponsor: null, coachName: COACHES[2].name, coachBonus: COACHES[2].bonus, stadiumLvl: 1 },
+    pres: { ticket: 3, sponsor: null, coachName: COACHES[2].name, coachBonus: COACHES[2].bonus, stadiumLvl: 1, sponsorPaid: false },
     incomeLast: 0, expenseLast: 0, lastFansDelta: 0, topScorers: [],
     lastResult: null, lastWasHome: true,
     seasonDone: false, outcome: null, outcomeTitle: "", outcomeText: "",
-    awards: { ballon: null, club: null, goleador: null, clubG: null },
+    awards: { ballon: null, club: null, goleador: null, clubG: null, podium: [] },
     history: [], eventLog: [], market: buildMarket(), scoutUsed: false, youthPromoted: false, trainCount: 0,
     season: 2026, career: [],
+    star: { reputation: 30, morale: 70, offers: [], pendingEvent: null, lastEventRound: -3 },
   };
 }
 
@@ -152,17 +153,28 @@ export const setUserXI = (g: GameState, ids: number[] | null) => { g.userXI = id
 
 export function teamStrength(g: GameState, clubId: number, xi: PlayerP[]): Strength {
   const avg = (f: (p: PlayerP) => number) => (xi.length ? xi.reduce((s, p) => s + f(p), 0) / xi.length : 60);
-  const atk = avg((p) => (p.pos === "DEL" ? p.med * 1.35 : p.pos === "MED" ? p.med : p.med * 0.7));
-  const def = avg((p) => (p.pos === "ARQ" || p.pos === "DEF" ? p.med * 1.25 : p.med * 0.8));
-  const mid = avg((p) => (p.pos === "MED" ? p.med * 1.2 : p.med * 0.9));
+  // las figuras pesan más: usamos el promedio de los 4 mejores + el resto
+  const sorted = [...xi].sort((a, b) => b.med - a.med);
+  const topAvg = (f: (p: PlayerP) => number, n: number) => {
+    const t = sorted.slice(0, n);
+    return t.length ? t.reduce((s, p) => s + f(p), 0) / t.length : 60;
+  };
+  const base = avg((p) => p.med);
+  const stars = topAvg((p) => p.med, 4);
+  const quality = base * 0.7 + stars * 0.3; // la jerarquía de las figuras levanta al equipo
+  const atk = avg((p) => (p.pos === "DEL" ? p.med * 1.4 : p.pos === "MED" ? p.med : p.med * 0.65)) * 0.7 + stars * 0.3;
+  const def = avg((p) => (p.pos === "ARQ" || p.pos === "DEF" ? p.med * 1.3 : p.med * 0.75)) * 0.75 + quality * 0.25;
+  const mid = avg((p) => (p.pos === "MED" ? p.med * 1.25 : p.med * 0.9));
+  // el prestigio institucional (historia, estadio, presión) suma o resta
+  const prestigeBoost = ((g.clubs[clubId]?.prestige ?? 3) - 3) * 1.6;
   const coach = clubId === g.userClub ? g.pres.coachBonus : 1;
   const user = clubId === g.userClub;
   const men = user ? g.dt.mentality : 1;
   const press = user ? g.dt.pressing : 1;
   return {
-    atk: atk + coach * 0.5 + (men === 2 ? 4 : men === 0 ? -2 : 0),
-    def: def + coach * 0.5 + (press === 2 ? 3 : 0) + (men === 0 ? 3 : 0),
-    mid: mid + coach * 0.4,
+    atk: atk + prestigeBoost + coach * 0.5 + (men === 2 ? 4 : men === 0 ? -2 : 0),
+    def: def + prestigeBoost * 0.8 + coach * 0.5 + (press === 2 ? 3 : 0) + (men === 0 ? 3 : 0),
+    mid: mid + prestigeBoost * 0.5 + coach * 0.4,
   };
 }
 
@@ -178,10 +190,14 @@ function poisson(lambda: number): number {
   return k - 1;
 }
 
-/* el mejor equipo gana más: la diferencia de fuerzas abre el marcador */
+/* el mejor equipo gana más: la diferencia de fuerzas abre el marcador (curva pronunciada) */
 function quickGoals(hs: Strength, as: Strength): { gh: number; ga: number } {
-  const expH = clamp((hs.atk / as.def - 0.78) * 2.0 + 0.25, 0.2, 4.4);
-  const expA = clamp((as.atk / hs.def - 0.78) * 1.9 + 0.2, 0.2, 4.0);
+  const ratioH = hs.atk / as.def;
+  const ratioA = as.atk / hs.def;
+  const HOME = 0.22; // ventaja de localía
+  // pow > 1 castiga al débil y premia al fuerte: un 10% mejor no gana 10% más, gana mucho más
+  const expH = clamp(Math.pow(ratioH, 2.6) * 1.25 + HOME - 0.25, 0.15, 4.6);
+  const expA = clamp(Math.pow(ratioA, 2.6) * 1.05 - 0.25, 0.1, 4.0);
   return { gh: poisson(expH), ga: poisson(expA) };
 }
 
@@ -349,6 +365,10 @@ export function closeRound(g: GameState, res: MatchResult, fx: Fixture, usedIds:
   // lesiones, forma, contratos, eventos inesperados
   processRound(g, ids);
 
+  // modo jugador: pueden llegar ofertas y decisiones espontáneas
+  maybeGenerateOffers(g);
+  maybeRollDecision(g);
+
   if (g.round >= g.totalRounds) startCup(g);
   else if (g.mode === "dt" && g.dt.patience <= 0) finishAll(g);
 }
@@ -427,6 +447,27 @@ export function playCupRound(g: GameState): MatchResult | null {
   return userRes;
 }
 
+/* Balón de Oro: ranking por temporada real (goles, minutos, campaña del club, títulos) */
+function computeBallon(g: GameState): { name: string; club: number; pts: number }[] {
+  const cupChamp = g.cup?.champion ?? -1;
+  const scored = g.players
+    .filter((p) => p.matches >= 5) // hay que haber jugado la temporada
+    .map((p) => {
+      const clubPts = g.standings[p.clubId]?.pts ?? 0;
+      const avg = p.ratings.length ? p.ratings.reduce((a, b) => a + b, 0) / p.ratings.length : 0;
+      const pts =
+        p.goals * 4 + // los goles mandan
+        p.matches * 0.4 + // regularidad (minutos)
+        clubPts * 0.12 + // campaña del equipo
+        (p.clubId === cupChamp ? 12 : 0) + // título continental
+        avg * 8 + // puntaje (solo el usuario lo tiene; los demás 0)
+        Math.max(0, p.med - 70) * 0.3; // leve base de calidad
+      return { name: p.name, club: p.clubId, pts: Math.round(pts * 10) / 10 };
+    })
+    .sort((a, b) => b.pts - a.pts);
+  return scored.slice(0, 3);
+}
+
 /* ================= FINAL DE TEMPORADA ================= */
 function finishAll(g: GameState) {
   g.seasonDone = true;
@@ -434,14 +475,12 @@ function finishAll(g: GameState) {
   const sorted = sortedTable(g);
   const pos = sorted.findIndex((s) => s.id === g.userClub) + 1;
 
-  // Balón de Oro Ñambi: goles x3 + promedio x10
-  let best: { name: string; club: number; pts: number } | null = null;
-  for (const p of g.players) {
-    const avg = p.ratings.length ? p.ratings.reduce((a, b) => a + b, 0) / p.ratings.length : 0;
-    const pts = p.goals * 3 + avg * 10 + p.med * 0.4;
-    if (!best || pts > best.pts) best = { name: p.name, club: p.clubId, pts };
+  // Balón de Oro Ñambi: se gana con una TEMPORADA REAL, no con la media
+  g.awards.podium = computeBallon(g);
+  if (g.awards.podium.length) {
+    g.awards.ballon = g.awards.podium[0].name;
+    g.awards.club = g.awards.podium[0].club;
   }
-  if (best) { g.awards.ballon = best.name; g.awards.club = best.club; }
   const goleador = g.topScorers[0];
   if (goleador) { g.awards.goleador = goleador.name; g.awards.clubG = goleador.club; }
 
@@ -752,7 +791,7 @@ export function startNextSeason(g: GameState) {
   g.standings = standings;
   g.round = 0; g.phase = "league"; g.cup = null; g.userXI = null;
   g.seasonDone = false; g.outcome = null; g.outcomeTitle = ""; g.outcomeText = "";
-  g.awards = { ballon: null, club: null, goleador: null, clubG: null };
+  g.awards = { ballon: null, club: null, goleador: null, clubG: null, podium: [] };
   g.lastResult = null; g.topScorers = [];
 
   /* --- reset del estado de los jugadores --- */
@@ -761,6 +800,8 @@ export function startNextSeason(g: GameState) {
   /* --- reset de la temporada --- */
   g.market = buildMarket();
   g.scoutUsed = false; g.youthPromoted = false; g.trainCount = 0;
+  g.pres.sponsorPaid = false;
+  g.star.offers = []; g.star.pendingEvent = null; g.star.lastEventRound = -3;
 
   if (g.mode === "dt") {
     g.dt.patience = 70; g.dt.trained = false; g.dt.boostPos = null; g.dt.boostAmt = 0;
@@ -768,6 +809,161 @@ export function startNextSeason(g: GameState) {
   }
 
   g.eventLog.unshift({ round: 0, kind: "good", text: `🏁 Arranca la temporada ${g.season}. ¡A dejar todo!` });
+}
+
+/* ================= ESTRELLA: OFERTAS Y DECISIONES (modo jugador) ================= */
+
+/* Después de cada fecha, según tu rendimiento y fama, pueden llegar ofertas */
+export function maybeGenerateOffers(g: GameState) {
+  if (g.mode !== "player") return;
+  const me = g.players.find((p) => p.id === g.userPlayerId);
+  if (!me) return;
+  const star = g.star;
+  // limpiar ofertas vencidas
+  star.offers = star.offers.filter((o) => o.expiresRound > g.round);
+  const recent = me.ratings.slice(-3);
+  const avg = recent.length ? recent.reduce((a, b) => a + b, 0) / recent.length : 0;
+  // necesitas buen nivel y algo de fama para que te miren
+  if (avg < 6.6 || star.reputation < 35 || star.offers.length >= 2) return;
+  if (Math.random() > 0.4 + star.reputation / 250) return; // no siempre llegan
+  // clubes que te quieren: mejores que el tuyo (o de otra liga si sos crack)
+  const myClub = getClub(g, g.userClub);
+  const candidates = g.clubs.filter(
+    (c) => c.id !== g.userClub && (c.prestige > myClub.prestige || (c.prestige === myClub.prestige && c.money > myClub.money + 5)) &&
+      !star.offers.some((o) => o.clubId === c.id),
+  ).sort((a, b) => b.prestige - a.prestige || b.money - a.money);
+  const pick = candidates[Math.floor(Math.random() * Math.min(3, candidates.length))];
+  if (!pick) return;
+  const fee = Math.round(valueOf(me.med) * (1.2 + star.reputation / 100) * 10) / 10;
+  const wage = Math.round(wageOf(me.med) * 1.8 * 10) / 10;
+  star.offers.push({ clubId: pick.id, fee, wage, expiresRound: g.round + 2 });
+  pushEvent(g, `📩 ¡OFERTA! ${pick.name} quiere comprarte por $${fee}M (salario $${wage}M/fecha).`, "good");
+}
+
+export function acceptOffer(g: GameState, clubId: number): boolean {
+  if (g.mode !== "player") return false;
+  const me = g.players.find((p) => p.id === g.userPlayerId);
+  const offer = g.star.offers.find((o) => o.clubId === clubId);
+  if (!me || !offer) return false;
+  const from = getClub(g, g.userClub);
+  const to = getClub(g, clubId);
+  from.money = Math.round((from.money + offer.fee) * 10) / 10; // tu club cobra la transferencia
+  me.clubId = clubId;
+  me.wage = offer.wage;
+  me.contract = 3;
+  me.value = offer.fee;
+  g.userClub = clubId;
+  g.userXI = null;
+  g.star.offers = [];
+  g.star.reputation = clamp(g.star.reputation + 8, 0, 100);
+  pushEvent(g, `✈️ ¡TRANSFERENCIA! Dejás ${from.name} y sos nuevo jugador de ${to.name} por $${offer.fee}M.`, "good");
+  return true;
+}
+
+export function rejectOffer(g: GameState, clubId: number) {
+  g.star.offers = g.star.offers.filter((o) => o.clubId !== clubId);
+  pushEvent(g, "🤝 Rechazaste la oferta. La hinchada valora tu fidelidad.", "info");
+  g.star.reputation = clamp(g.star.reputation + 2, 0, 100);
+}
+
+/* Decisiones inesperadas y espontáneas, al estilo potrero */
+const DECISIONS: Omit<DecisionEvent, "id">[] = [
+  {
+    icon: "🎤", title: "LA PRENSA TE BUSCA",
+    text: "Un periodista te pregunta si te ves en la selección. Todo el vestuario está mirando la nota.",
+    options: [
+      { label: "«Es mi sueño, trabajo para eso»", text: "Respondiste con humildad. Sumaste imagen.", rep: 5, morale: 4, energy: 0, money: 0 },
+      { label: "«Soy el mejor del país, obvio»", text: "Polémica en redes. Fama arriba, pero el vestuario te mira raro.", rep: 9, morale: -6, energy: 0, money: 0 },
+      { label: "Pasar de largo sin hablar", text: "Te fuiste sin declarar. Nadie dijo nada.", rep: -2, morale: 2, energy: 0, money: 0 },
+    ],
+  },
+  {
+    icon: "🎉", title: "FIESTA DESPUÉS DEL TRIUNFO",
+    text: "Los muchachos organizan un asado largo esta noche. Mañana hay entrenamiento temprano.",
+    options: [
+      { label: "Ir un rato y volver temprano", text: "Compañerismo sin excesos. El grupo te quiere.", rep: 3, morale: 8, energy: -8, money: 0 },
+      { label: "Quedarte hasta cualquier hora", text: "La rompiste en la fiesta, pero llegaste muerto al entreno.", rep: 5, morale: 12, energy: -25, money: 0 },
+      { label: "Descansar, hay que cuidarse", text: "Dormiste 9 horas. El DT lo valora.", rep: 0, morale: -2, energy: 12, money: 0 },
+    ],
+  },
+  {
+    icon: "👔", title: "EL DT TE OFRECE LA CINTA",
+    text: "El técnico quiere que seas uno de los capitanes. Es una responsabilidad grande.",
+    options: [
+      { label: "Aceptar la capitanía", text: "Sos capitán. Más presión, más liderazgo.", rep: 8, morale: 6, energy: -4, money: 0 },
+      { label: "Rechazarla con respeto", text: "Preferís enfocarte solo en jugar.", rep: 0, morale: 2, energy: 0, money: 0 },
+    ],
+  },
+  {
+    icon: "💰", title: "PUBLICIDAD DE ZAPATILLAS",
+    text: "Una marca te ofrece ser su cara por un contrato corto. Implica dos días de grabación.",
+    options: [
+      { label: "Firmar la campaña", text: "Buen dinero, pero perdiste días de descanso.", rep: 4, morale: 3, energy: -10, money: 3 },
+      { label: "Rechazarla", text: "Priorizaste el fútbol.", rep: 1, morale: 0, energy: 0, money: 0 },
+    ],
+  },
+  {
+    icon: "🏥", title: "MOLESTIA EN EL GEMELO",
+    text: "Sentís una molestia. El médico dice que puede ser algo leve… o no. Vos decidís.",
+    options: [
+      { label: "Jugar igual, sos de fierro", text: "Aguantaste el dolor. Riesgo de lesión mayor.", rep: 4, morale: 2, energy: -18, money: 0 },
+      { label: "Parar una fecha y tratarte", text: "Te cuidaste. El DT lo entendió.", rep: -1, morale: 0, energy: 15, money: 0 },
+    ],
+  },
+  {
+    icon: "🔥", title: "CRUCE CON EL RIVAL",
+    text: "Un rival te pegó de más y te desafía frente a las cámaras. La sangre hierve.",
+    options: [
+      { label: "Responderle en la cancha", text: "Guardaste la bronca para el próximo cruce.", rep: 3, morale: 5, energy: 0, money: 0 },
+      { label: "Declarar fuerte en la prensa", text: "Calentaste el clásico. Fama pura.", rep: 7, morale: 3, energy: 0, money: 0 },
+      { label: "Ignorarlo", text: "No caíste en la provocación.", rep: 0, morale: 1, energy: 0, money: 0 },
+    ],
+  },
+  {
+    icon: "🎯", title: "ENTRENAMIENTO EXTRA",
+    text: "Podés quedarte una hora más a pulir la pegada con el profesor de tiro libre.",
+    options: [
+      { label: "Quedarte a practicar tiros", text: "Mejoraste el remate.", rep: 0, morale: 1, energy: -8, money: 0, stat: "tiro", statAmt: 1 },
+      { label: "Quedarte a practicar pases", text: "Mejoraste el pase.", rep: 0, morale: 1, energy: -8, money: 0, stat: "pase", statAmt: 1 },
+      { label: "Irte a descansar", text: "Recuperaste energías.", rep: 0, morale: 0, energy: 8, money: 0 },
+    ],
+  },
+];
+
+export function maybeRollDecision(g: GameState) {
+  if (g.mode !== "player") return;
+  const star = g.star;
+  if (star.pendingEvent) return; // ya hay una esperando
+  if (g.round - star.lastEventRound < 2) return; // no tan seguido
+  if (Math.random() > 0.38) return;
+  const d = DECISIONS[Math.floor(Math.random() * DECISIONS.length)];
+  star.pendingEvent = { ...d, id: `${g.round}-${Math.floor(Math.random() * 1e6)}` };
+  star.lastEventRound = g.round;
+}
+
+export function resolveDecision(g: GameState, optIdx: number): DecisionOption | null {
+  const ev = g.star.pendingEvent;
+  if (!ev) return null;
+  const opt = ev.options[optIdx];
+  g.star.pendingEvent = null;
+  if (!opt) return null;
+  const me = g.players.find((p) => p.id === g.userPlayerId);
+  g.star.reputation = clamp(g.star.reputation + opt.rep, 0, 100);
+  g.star.morale = clamp(g.star.morale + opt.morale, 0, 100);
+  if (me) {
+    me.energy = clamp(me.energy + opt.energy, 0, 100);
+    if (opt.stat && me.stats) {
+      me.stats[opt.stat] = clamp(me.stats[opt.stat] + (opt.statAmt ?? 1), 40, 95);
+      me.med = medFromStats(me.stats, me.pos);
+      me.value = valueOf(me.med);
+    }
+  }
+  if (opt.money) {
+    const c = getClub(g, g.userClub);
+    c.money = Math.round((c.money + opt.money) * 10) / 10;
+  }
+  pushEvent(g, `${ev.icon} ${opt.text}`, opt.rep >= 0 ? "good" : "info");
+  return opt;
 }
 
 /* ================= GUARDADO (a prueba de versiones) ================= */
@@ -795,7 +991,8 @@ function migrate(raw: string): GameState | null {
   }
   if (!g.phase) g.phase = g.seasonDone ? "done" : g.round >= g.totalRounds ? "cup" : "league";
   if (g.cup === undefined) g.cup = null;
-  if (!g.awards) g.awards = { ballon: null, club: null, goleador: null, clubG: null };
+  if (!g.awards) g.awards = { ballon: null, club: null, goleador: null, clubG: null, podium: [] };
+  if (!Array.isArray(g.awards.podium)) g.awards.podium = [];
   if (g.userXI === undefined) g.userXI = null;
   if (!g.userRole) g.userRole = g.userPos === "DEF" ? "DFC" : g.userPos === "MED" ? "MC" : "P9";
   if (!g.userPos) g.userPos = "DEL";
@@ -805,7 +1002,13 @@ function migrate(raw: string): GameState | null {
   }
   if (!g.topScorers) g.topScorers = [];
   if (!g.dt) g.dt = { formation: "4-3-3", mentality: 1, pressing: 1, patience: 70, expectPos: 5, boostPos: null, boostAmt: 0, trained: false };
-  if (!g.pres) g.pres = { ticket: 3, sponsor: null, coachName: "Don Menotti Jr.", coachBonus: 1, stadiumLvl: 1 };
+  if (!g.pres) g.pres = { ticket: 3, sponsor: null, coachName: "Don Menotti Jr.", coachBonus: 1, stadiumLvl: 1, sponsorPaid: true };
+  if (typeof g.pres.sponsorPaid !== "boolean") g.pres.sponsorPaid = true; // partidas viejas: ya no se regala upfront
+  if (!g.star) g.star = { reputation: 30, morale: 70, offers: [], pendingEvent: null, lastEventRound: -3 };
+  if (typeof g.star.reputation !== "number") g.star.reputation = 30;
+  if (typeof g.star.morale !== "number") g.star.morale = 70;
+  if (!Array.isArray(g.star.offers)) g.star.offers = [];
+  if (typeof g.star.lastEventRound !== "number") g.star.lastEventRound = -3;
   if (typeof g.incomeLast !== "number") g.incomeLast = 0;
   if (typeof g.expenseLast !== "number") g.expenseLast = 0;
   if (typeof g.lastFansDelta !== "number") g.lastFansDelta = 0;

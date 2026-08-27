@@ -264,10 +264,32 @@ export default function ArcadeMatch(props: Props) {
         let tx = e.x, ty = e.y, sp = 90 * spdScale;
         if (e.isGk) {
           const gx = e.team === 0 ? 46 : W - 46;
-          tx = gx; ty = clamp(b.y, H / 2 - 84, H / 2 + 84);
-          sp = 170;
-          if (b.owner < 0 && dist(e, b) < 26 && Math.abs(b.x - gx) < 120) {
-            b.owner = i; b.vx = 0; b.vy = 0; b.lastTouch = i; s.graceT = 0.4;
+          if (b.owner === i) {
+            // el arquero TIENE la pelota: se para y la suelta rápido (no se queda trabado)
+            tx = gx; ty = clamp(e.y, H / 2 - 84, H / 2 + 84); sp = 40;
+            if (e.kickCd <= 0 && e.holdT > 0.45) {
+              const dirX = e.team === 0 ? 1 : -1;
+              const mates = s.ents.filter((o) => o.team === e.team && !o.isGk);
+              let target: Ent | null = null, bestScore = -1e9;
+              for (const m of mates) {
+                const press = Math.min(...s.ents.filter((o) => o.team !== e.team && !o.isGk).map((o) => dist(o, m)), 999);
+                const score = m.x * dirX * 0.5 + press;
+                if (score > bestScore) { bestScore = score; target = m; }
+              }
+              if (target && Math.random() < 0.72) {
+                const dx = target.x - b.x, dy = target.y - b.y, dl = Math.hypot(dx, dy) || 1;
+                b.vx = (dx / dl) * 540; b.vy = (dy / dl) * 540;
+              } else {
+                b.vx = dirX * (680 + Math.random() * 90); b.vy = (Math.random() - 0.5) * 240;
+              }
+              b.owner = -1; b.lastTouch = i; e.kickCd = 0.9; s.graceT = 0;
+              sfx.kick();
+            }
+          } else {
+            tx = gx; ty = clamp(b.y, H / 2 - 84, H / 2 + 84); sp = 170;
+            if (b.owner < 0 && dist(e, b) < 26 && Math.abs(b.x - gx) < 120) {
+              b.owner = i; b.vx = 0; b.vy = 0; b.lastTouch = i; s.graceT = 0.4;
+            }
           }
         } else if (b.owner === i) {
           tx = e.team === 0 ? W - 30 : 30;

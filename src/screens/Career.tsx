@@ -6,9 +6,9 @@ import {
 import type { Fm, GameState, PlayerP, Pos } from "../game/core";
 import { ROLES, isClasico, roleOf, valueOf } from "../game/core";
 import {
-  buyPlayer, changeRole, clubMoney, computeNews, cupName, getClub, isKeyMatch, jumpToKeyMatch,
-  leagueName, negotiateContract, promoteYouth, scoutAction, sellPlayer, setUserXI, simDateQuick,
-  simRestOfSeason, sortedTable, squadOf, trainLine, trainPlayer, userCupTie, userInCup, userNextFixture, xiOf,
+  acceptOffer, buyPlayer, changeRole, clubMoney, computeNews, cupName, getClub, isKeyMatch, jumpToKeyMatch,
+  leagueName, negotiateContract, promoteYouth, rejectOffer, resolveDecision, scoutAction, sellPlayer, setUserXI,
+  simDateQuick, simRestOfSeason, sortedTable, squadOf, trainLine, trainPlayer, userCupTie, userInCup, userNextFixture, xiOf,
 } from "../game/engine";
 import { sfx } from "../game/audio";
 import { Crest, MedBadge, PosTag } from "../components/ui";
@@ -64,6 +64,12 @@ export function Hub({ g, refresh, onPlayLive, onCupRound, onHelp, muted, onMute 
           )}
           {g.mode !== "player" && (
             <span className="chip bg-night-800 border border-gold/40 text-gold text-sm">$ {clubMoney(g).toFixed(1)}M</span>
+          )}
+          {g.mode === "player" && (
+            <span className="chip bg-night-800 border border-lima/40 text-lima text-sm">★ FAMA {Math.round(g.star.reputation)}</span>
+          )}
+          {g.mode === "player" && g.star.offers.length > 0 && (
+            <span className="chip bg-gold/20 border border-gold/50 text-gold text-sm animate-pulse">📩 {g.star.offers.length} OFERTA{g.star.offers.length > 1 ? "S" : ""}</span>
           )}
           <button className="btn btn-ghost px-3 py-1.5" onClick={onMute}>{muted ? "🔇" : "🔊"}</button>
           <button className="btn btn-ghost px-3 py-1.5" onClick={onHelp}><HelpCircle size={16} /></button>
@@ -164,6 +170,8 @@ export function Hub({ g, refresh, onPlayLive, onCupRound, onHelp, muted, onMute 
         {tab === "historial" && <HistoryTab g={g} />}
         {tab === "liga" && <LeagueTab g={g} />}
         {tab === "copa" && g.cup && <CupTab g={g} />}
+
+        {g.mode === "player" && g.star.pendingEvent && <DecisionModal g={g} refresh={refresh} />}
       </div>
     </div>
   );
@@ -398,6 +406,48 @@ function CareerTab({ g, refresh }: { g: GameState; refresh: () => void }) {
           ))}
         </div>
       </div>
+
+      {/* reputación, moral y mercado de pases del jugador */}
+      <div className="grid md:grid-cols-2 gap-5">
+        <div className="panel p-5 animate-risein">
+          <h3 className="font-display text-2xl tracking-wide mb-3">TU <span className="text-gold">IMAGEN</span></h3>
+          {([["Reputación", g.star.reputation, "#b8ff2e"], ["Moral", g.star.morale, "#41d6ff"]] as [string, number, string][]).map(([k, v, c]) => (
+            <div key={k} className="flex items-center gap-3 mb-2">
+              <span className="w-20 text-xs text-chalk/60">{k}</span>
+              <div className="flex-1 h-2.5" style={{ background: "rgba(3,13,7,0.7)", border: "1px solid rgba(242,255,233,0.15)" }}>
+                <div className="h-full transition-all" style={{ width: `${v}%`, background: c }} />
+              </div>
+              <span className="font-display w-8 text-right">{Math.round(v)}</span>
+            </div>
+          ))}
+          <p className="text-xs text-chalk/50 mt-3">La reputación sube con buenos partidos y decisiones. Con 35+ empiezan a llegar ofertas.</p>
+        </div>
+
+        <div className="panel p-5 animate-risein">
+          <h3 className="font-display text-2xl tracking-wide mb-3">OFERTAS <span className="text-lima">({g.star.offers.length})</span></h3>
+          {g.star.offers.length === 0 ? (
+            <p className="text-sm text-chalk/50">Ningún club te busca por ahora. Jugá bien (7+) y mantené tu reputación alta para recibir ofertas.</p>
+          ) : (
+            <div className="space-y-2">
+              {g.star.offers.map((o) => {
+                const c = getClub(g, o.clubId);
+                return (
+                  <div key={o.clubId} className="panel-soft p-3 flex items-center gap-3">
+                    <Crest club={c} size={36} />
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold truncate">{c.name}</div>
+                      <div className="text-xs text-chalk/50">Transferencia <b className="text-gold">${o.fee}M</b> · Salario <b className="text-lima">${o.wage}M/fecha</b> · vence en {o.expiresRound - g.round} fecha(s)</div>
+                    </div>
+                    <button className="btn btn-lima px-3 py-1 text-sm" onClick={() => { if (acceptOffer(g, o.clubId)) { sfx.coins(); refresh(); } }}><span>IRME</span></button>
+                    <button className="btn btn-ghost px-3 py-1 text-sm" onClick={() => { rejectOffer(g, o.clubId); sfx.click(); refresh(); }}><span>QUEDARME</span></button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
     </div>
   );
 }
@@ -438,11 +488,23 @@ function FinanceTab({ g, refresh }: { g: GameState; refresh: () => void }) {
         <div className="space-y-2">
           {[{ name: "Banco Ñambi", upfront: 4, perMatch: 0.6 }, { name: "AeroCharrúa", upfront: 7, perMatch: 0.3 }, { name: "Gaseosa Gol", upfront: 2, perMatch: 1.0 }].map((sp) => (
             <button key={sp.name} className="btn btn-ghost w-full py-2" disabled={g.pres.sponsor?.name === sp.name}
-              onClick={() => { g.pres.sponsor = sp; club.money += sp.upfront; refresh(); sfx.coins(); }}>
-              <span>{sp.name} · +${sp.upfront}M ya · +${sp.perMatch}M/fecha</span>
+              onClick={() => {
+                const first = !g.pres.sponsorPaid; // el adelanto se cobra UNA vez por temporada
+                if (g.pres.sponsor) club.money -= 1.5; // rescindir cuesta $1.5M
+                g.pres.sponsor = sp;
+                if (first) { club.money += sp.upfront; g.pres.sponsorPaid = true; }
+                refresh(); sfx.coins();
+              }}>
+              <span>
+                {sp.name}
+                {g.pres.sponsor
+                  ? ` · cambio (−$1.5M rescisión) · +$${sp.perMatch}M/fecha`
+                  : ` · +$${sp.upfront}M ya · +$${sp.perMatch}M/fecha`}
+              </span>
             </button>
           ))}
         </div>
+        <p className="text-xs text-chalk/40 mt-2">El adelanto se cobra una sola vez por temporada; cambiar de sponsor cuesta la rescisión.</p>
       </div>
 
       <div className="panel p-5 animate-risein">
@@ -847,11 +909,20 @@ export function EndScreen({ g, onRestart, onNextSeason }: { g: GameState; onRest
           </div>
           <div className="panel-soft p-4">
             <div className="font-display text-xl tracking-wider text-gold mb-2 flex items-center gap-2"><Star size={16} />BALÓN DE ORO ÑAMBI</div>
-            {g.awards.ballon ? (
-              <div className="flex items-center gap-2">
-                <Crest club={getClub(g, g.awards.club!)} size={30} />
-                <b>{g.awards.ballon}</b>
-                {ballonUser && <span className="chip bg-lima/20 border border-lima/50 text-lima text-xs">¡VOS!</span>}
+            {g.awards.podium.length ? (
+              <div className="space-y-1.5">
+                {g.awards.podium.map((p, i) => {
+                  const isMe = me && p.name === me.name;
+                  return (
+                    <div key={p.name} className="flex items-center gap-2 text-sm">
+                      <span className={`font-display text-lg w-6 ${i === 0 ? "text-gold" : i === 1 ? "text-chalk/70" : "text-[#b87333]"}`}>{i + 1}º</span>
+                      <Crest club={getClub(g, p.club)} size={22} />
+                      <b className="flex-1 truncate">{p.name}</b>
+                      <span className="text-chalk/50 text-xs">{p.pts} pts</span>
+                      {isMe && <span className="chip bg-lima/20 border border-lima/50 text-lima text-xs">¡VOS!</span>}
+                    </div>
+                  );
+                })}
               </div>
             ) : <span className="text-chalk/50 text-sm">—</span>}
             {g.awards.goleador && (
@@ -909,6 +980,39 @@ export function EndScreen({ g, onRestart, onNextSeason }: { g: GameState; onRest
           <button className="btn btn-ghost px-8 py-4 text-lg" onClick={onRestart}><span>REINICIAR CARRERA</span></button>
         </div>
         <p className="text-xs text-chalk/40 mt-3">Los jugadores envejecen, los veteranos se retiran y los contratos vencen. Tu leyenda continúa.</p>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- DECISIÓN ESPONTÁNEA (modo jugador) ---------------- */
+function DecisionModal({ g, refresh }: { g: GameState; refresh: () => void }) {
+  const ev = g.star.pendingEvent;
+  const [result, setResult] = useState<string | null>(null);
+  if (!ev) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-night-950/85 backdrop-blur px-4">
+      <div className="panel p-7 max-w-lg w-full animate-popin">
+        <div className="flex items-center gap-3 mb-2">
+          <span className="text-5xl">{ev.icon}</span>
+          <h3 className="font-display text-3xl tracking-wide text-gold">{ev.title}</h3>
+        </div>
+        <p className="text-chalk/80 mb-5">{ev.text}</p>
+        {!result ? (
+          <div className="space-y-2">
+            {ev.options.map((o, i) => (
+              <button key={i} className="btn btn-ghost w-full py-2.5 text-left"
+                onClick={() => { const r = resolveDecision(g, i); if (r) setResult(r.text); sfx.click(); }}>
+                <span className="text-sm normal-case">{o.label}</span>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center">
+            <p className="text-lima mb-5">{result}</p>
+            <button className="btn btn-lima px-10 py-2.5" onClick={() => { refresh(); }}><span>SEGUIR</span></button>
+          </div>
+        )}
       </div>
     </div>
   );

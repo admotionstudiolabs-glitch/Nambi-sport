@@ -62,12 +62,15 @@ export interface GameState {
     formation: Fm; mentality: number; pressing: number; patience: number;
     expectPos: number; boostPos: Pos | null; boostAmt: number; trained: boolean;
   };
-  pres: { ticket: number; sponsor: Sponsor | null; coachName: string; coachBonus: number; stadiumLvl: number };
+  pres: { ticket: number; sponsor: Sponsor | null; coachName: string; coachBonus: number; stadiumLvl: number; sponsorPaid: boolean };
   incomeLast: number; expenseLast: number; lastFansDelta: number;
   topScorers: { pid: number; name: string; club: number; goals: number }[];
   lastResult: MatchResult | null; lastWasHome: boolean;
   seasonDone: boolean; outcome: "win" | "lose" | null; outcomeTitle: string; outcomeText: string;
-  awards: { ballon: string | null; club: number | null; goleador: string | null; clubG: number | null };
+  awards: {
+    ballon: string | null; club: number | null; goleador: string | null; clubG: number | null;
+    podium: { name: string; club: number; pts: number }[];
+  };
   history: MatchRecord[];
   eventLog: GameEvent[];
   market: MarketPlayer[];
@@ -76,6 +79,7 @@ export interface GameState {
   trainCount: number;
   season: number;
   career: CareerSeason[];
+  star: StarState;
 }
 
 /* ================= PARTIDOS / EVENTOS / MERCADO ================= */
@@ -93,6 +97,27 @@ export interface MarketPlayer {
 export interface CareerSeason {
   season: number; club: number; pos: number; cupWon: boolean; outcome: "win" | "lose";
   ballon: boolean; relegated?: boolean;
+}
+
+/* ================= ESTRELLA (modo jugador) ================= */
+export interface TransferOffer {
+  clubId: number; fee: number; wage: number; expiresRound: number;
+}
+export interface DecisionOption {
+  label: string;
+  text: string; // resultado que se muestra
+  rep: number; morale: number; energy: number; money: number; stat?: keyof PlayerStats; statAmt?: number;
+}
+export interface DecisionEvent {
+  id: string; icon: string; title: string; text: string;
+  options: DecisionOption[];
+}
+export interface StarState {
+  reputation: number; // 0-100 fama
+  morale: number; // 0-100
+  offers: TransferOffer[];
+  pendingEvent: DecisionEvent | null;
+  lastEventRound: number;
 }
 
 /* ================= LIGAS ================= */
