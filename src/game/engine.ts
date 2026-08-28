@@ -1053,11 +1053,19 @@ function migrate(raw: string): GameState | null {
   g.players.forEach((p) => {
     if (typeof p.num !== "number") p.num = 0;
     if (!p.nat) p.nat = "—";
-    if (typeof p.wage !== "number") p.wage = wageOf(p.med);
+    // SIEMPRE recalculo el salario con la escala actual (las partidas viejas
+    // traían salarios gigantes que fundían al club en un par de fechas)
+    p.wage = wageOf(p.med);
     if (typeof p.contract !== "number") p.contract = 2;
     if (typeof p.injured !== "number") p.injured = 0;
     if (typeof p.form !== "number") p.form = 70;
     if (typeof p.baseMed !== "number") p.baseMed = p.med;
+    if (typeof p.value !== "number") p.value = valueOf(p.med);
+  });
+
+  // saneamiento de cajas: ninguna deuda imposible heredada de la escala vieja
+  g.clubs.forEach((c) => {
+    c.money = clamp(c.money, c.id === g.userClub ? -8 : 2, 500);
   });
   return g;
 }

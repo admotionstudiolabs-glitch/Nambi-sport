@@ -174,7 +174,10 @@ export function medFromStats(s: PlayerStats, pos: Pos): number {
 }
 
 export const valueOf = (med: number) => Math.round(Math.pow(Math.max(1, med - 52) / 10, 2.6) * 1.2 * 10) / 10;
-export const wageOf = (med: number) => Math.round(Math.pow(Math.max(1, med - 50) / 12, 2.2) * 100) / 100;
+/* salario POR FECHA: proporcional al valor de mercado, calibrado para que la
+   planilla completa (~30 jugadores) ronde el 50-70% de los ingresos por fecha.
+   Con la escala vieja un solo crack costaba $10M/fecha y fundía al club. */
+export const wageOf = (med: number) => Math.max(0.01, Math.round(valueOf(med) * 0.0012 * 100) / 100);
 
 export function statsFor(med: number, pos: Pos): PlayerStats {
   const j = () => Math.round((Math.random() - 0.5) * 6);
